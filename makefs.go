@@ -39,27 +39,31 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 	}
 
 	for _, target := range fs.rule.targets {
-		if isPattern(target) {
-			stem := findStem(path, target)
+		if !isPattern(target) {
+			return nil, fmt.Errorf("not done yet: non-pattern targets")
+		}
 
-			// target pattern did not match, rule does not apply
-			if stem == "" {
-				break
+		stem := findStem(path, target)
+
+		// target pattern did not match, rule does not apply
+		if stem == "" {
+			break
+		}
+
+		for _, source := range fs.rule.sources {
+			if !isPattern(source) {
+				return nil, fmt.Errorf("not done yet: non-pattern sources")
 			}
 
-			for _, source := range fs.rule.sources {
-				if isPattern(source) {
-					sourcePath := insertStem(source, stem)
-					sourceFile, err := fs.parent.Open(sourcePath)
-					if isNotFound(err) {
-						return nil, fmt.Errorf("not done yet: pattern source not found")
-					} else if err != nil {
-						return nil, err
-					}
-
-					task.source = &Source{file: sourceFile}
-				}
+			sourcePath := insertStem(source, stem)
+			sourceFile, err := fs.parent.Open(sourcePath)
+			if isNotFound(err) {
+				return nil, fmt.Errorf("not done yet: pattern source not found")
+			} else if err != nil {
+				return nil, err
 			}
+
+			task.source = &Source{file: sourceFile}
 		}
 	}
 
@@ -128,12 +132,6 @@ type proxyFile struct {
 	reader io.Reader
 
 	parent http.File
-
-	//Close() error
-	//Stat() (os.FileInfo, error)
-	//Readdir(count int) ([]os.FileInfo, error)
-	//Read([]byte) (int, error)
-	//Seek(offset int64, whence int) (int64, error)
 }
 
 func (file *proxyFile) Close() error {
