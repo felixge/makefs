@@ -34,10 +34,10 @@ func (fs *Fs) Open(path string) (http.File, error) {
 	return fs.head.Open(path)
 }
 
-func (fs *Fs) Make(target string, source string, recipe Recipe) {
+func (fs *Fs) MakeMulti(targets []string, sources []string, recipe Recipe) {
 	rule := &rule{
-		targets: []string{target},
-		sources: []string{source},
+		targets: targets,
+		sources: sources,
 		recipe: recipe,
 	}
 
@@ -45,6 +45,10 @@ func (fs *Fs) Make(target string, source string, recipe Recipe) {
 		parent: fs.head,
 		rule: rule,
 	}
+}
+
+func (fs *Fs) Make(target string, source string, recipe Recipe) {
+	fs.MakeMulti([]string{target}, []string{source}, recipe)
 }
 
 type ruleFs struct {
