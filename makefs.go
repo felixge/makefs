@@ -38,7 +38,6 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		return nil, fmt.Errorf("not done yet: multiple sources")
 	}
 
-outer:
 	for _, target := range fs.rule.targets {
 		if isPattern(target) {
 			stem := findStem(path, target)
@@ -53,7 +52,7 @@ outer:
 					sourcePath := insertStem(source, stem)
 					sourceFile, err := fs.parent.Open(sourcePath)
 					if isNotFound(err) {
-						break outer
+						return nil, fmt.Errorf("not done yet: pattern source not found")
 					} else if err != nil {
 						return nil, err
 					}
@@ -184,5 +183,5 @@ func (t *task) Source() *Source {
 type rule struct {
 	targets []string
 	sources []string
-	recipe  func(*task)
+	recipe  func(*task) error
 }

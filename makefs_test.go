@@ -1,10 +1,10 @@
 package makefs
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -16,19 +16,22 @@ var (
 	__dirname           = filepath.Dir(__filename)
 )
 
-func ExampleOpen() {
+func TestRuleFs_Read(t *testing.T) {
 	fs := strongRuleFs()
 	file, err := fs.Open("/foo.strong")
 	if err != nil {
-		fmt.Printf("Open: %#v", err)
-		return
+		t.Fatal(err)
 	}
 
-	io.Copy(os.Stdout, file)
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, file); err != nil {
+		t.Fatal(err)
+	}
 
-	// Output:
-	// <strong>May the foo be with you!
-	// </strong>
+	expected := "<strong>May the foo be with you!\n</strong>"
+	if buf.String() != expected {
+		t.Fatalf("unexpected result: %s", buf)
+	}
 }
 
 func ExampleReaddir() {
@@ -103,12 +106,19 @@ func strongRuleFs() http.FileSystem {
 		rule: &rule{
 			targets: []string{"%.strong"},
 			sources: []string{"%.txt"},
-			recipe: func(task *task) {
+			recipe: func(task *task) error {
 				target := task.Target()
-				target.Write([]byte("<strong>"))
-				io.Copy(target, task.Source())
-				target.Write([]byte("</strong>"))
+				if _, err := target.Write([]byte("<strong>")); err != nil {
+					return err
+				}
+				if _, err := io.Copy(target, task.Source()); err != nil {
+					return err
+				}
+				if _, err := target.Write([]byte("</strong>")); err != nil {
+					return err
+				}
 				target.Close()
+				return nil
 			},
 		},
 	}
