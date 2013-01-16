@@ -12,15 +12,15 @@ type broadcast struct {
 	clientsLock sync.RWMutex
 	clients     []*client
 	cacheLock   *sync.RWMutex
-	cacheCond   *sync.Cond
+	cacheUpdate *sync.Cond
 	cache       []byte
 }
 
 func newBroadcast() *broadcast {
 	cacheLock := &sync.RWMutex{}
 	return &broadcast{
-		cacheLock: cacheLock,
-		cacheCond: sync.NewCond(cacheLock.RLocker()),
+		cacheLock:   cacheLock,
+		cacheUpdate: sync.NewCond(cacheLock.RLocker()),
 	}
 }
 
@@ -29,7 +29,7 @@ func (b *broadcast) Write(buf []byte) (int, error) {
 	b.cache = append(b.cache, buf...)
 	b.cacheLock.Unlock()
 
-	b.cacheCond.Broadcast()
+	b.cacheUpdate.Broadcast()
 
 	return len(buf), nil
 }
@@ -44,7 +44,7 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 		}
 
 		// aquires a new RLock() before returning
-		b.cacheCond.Wait()
+		b.cacheUpdate.Wait()
 	}
 	panic("unreachable")
 }
