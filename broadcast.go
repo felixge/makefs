@@ -12,7 +12,7 @@ type broadcast struct {
 	cacheLock   sync.RWMutex
 	cacheUpdate sync.Cond
 	cache       []byte
-	closed      bool
+	closeErr    error
 }
 
 func newBroadcast() *broadcast {
@@ -24,8 +24,10 @@ func newBroadcast() *broadcast {
 func (b *broadcast) Write(buf []byte) (int, error) {
 	b.cacheLock.Lock()
 	defer b.cacheLock.Unlock()
-	if b.closed {
+	if b.closeErr == io.EOF {
 		return 0, io.ErrClosedPipe
+	} else if b.closeErr != nil {
+		return 0, b.closeErr
 	}
 
 	b.cache = append(b.cache, buf...)
@@ -43,8 +45,8 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 			return copy(buf, b.cache[offset:]), nil
 		}
 
-		if b.closed {
-			return 0, io.EOF
+		if b.closeErr != nil {
+			return 0, b.closeErr
 		}
 
 		// aquires a new RLock() before returning
@@ -54,10 +56,18 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 }
 
 func (b *broadcast) Close() error {
+	return b.CloseWithError(nil)
+}
+
+func (b *broadcast) CloseWithError(err error) error {
+	if err == nil {
+		err = io.EOF
+	}
+
 	b.cacheLock.Lock()
 	defer b.cacheLock.Unlock()
 
-	b.closed = true
+	b.closeErr = err
 	b.cacheUpdate.Broadcast()
 
 	return nil

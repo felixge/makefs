@@ -122,12 +122,9 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 
 	// @TODO, do not execute recipe until first Read() ?
 	go func() {
-		if err := fs.rule.recipe(task); err != nil {
-			// what?
-		}
-
+		err := fs.rule.recipe(task)
+		task.target.CloseWithError(err)
 		task.source.Close()
-		task.target.Close()
 	}()
 
 	return newTargetFile(task.target, path), nil

@@ -1,6 +1,8 @@
 package makefs
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -70,5 +72,19 @@ func TestBroadcast(t *testing.T) {
 
 	if _, err := broadcast.Write([]byte("should not work")); err != io.ErrClosedPipe {
 		t.Fatal(err)
+	}
+}
+
+func TestBroadcast_CloseWithError(t *testing.T) {
+	closeErr := fmt.Errorf("some error")
+
+	broadcast := newBroadcast()
+	broadcast.Write([]byte("abc"))
+	broadcast.CloseWithError(closeErr)
+
+	buf := new(bytes.Buffer)
+	_, err := io.Copy(buf, broadcast.Client())
+	if err != closeErr {
+		t.Fatal("unexpected: %#v", err)
 	}
 }
