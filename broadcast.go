@@ -9,17 +9,19 @@ import (
 // Additionally it caches all writes, so that new clients won't miss any
 // data.
 type broadcast struct {
-	clientsLock  sync.RWMutex
-	clients      []*client
-	cacheLock    sync.RWMutex
-	cache        []byte
-	waiters int
-	waitersLock sync.Mutex
-	signal  chan interface{}
+	clientsLock sync.RWMutex
+	clients     []*client
+	cacheLock   *sync.RWMutex
+	cacheCond   *sync.Cond
+	cache       []byte
 }
 
 func newBroadcast() *broadcast {
-	return &broadcast{signal: make(chan interface{})}
+	cacheLock := &sync.RWMutex{}
+	return &broadcast{
+		cacheLock: cacheLock,
+		cacheCond: sync.NewCond(cacheLock.RLocker()),
+	}
 }
 
 func (b *broadcast) Write(buf []byte) (int, error) {
@@ -27,43 +29,24 @@ func (b *broadcast) Write(buf []byte) (int, error) {
 	b.cache = append(b.cache, buf...)
 	b.cacheLock.Unlock()
 
-	// notify any goroutines wait()ing for a write
-	b.broadcast()
+	b.cacheCond.Broadcast()
 
 	return len(buf), nil
 }
 
 func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
+	b.cacheLock.RLock()
 	for {
-		b.cacheLock.RLock()
 		if int(offset) < len(b.cache) {
+			n := copy(buf, b.cache[offset:])
 			b.cacheLock.RUnlock()
-			return copy(buf, b.cache[offset:]), nil
+			return n, nil
 		}
 
-		b.cacheLock.RUnlock()
-
-		// wait for the next write
-		b.wait()
+		// aquires a new RLock() before returning
+		b.cacheCond.Wait()
 	}
 	panic("unreachable")
-}
-
-func (b *broadcast) broadcast() {
-	b.waitersLock.Lock()
-	defer b.waitersLock.Unlock()
-
-	for i := 0; i < b.waiters; i++ {
-		b.signal <- nil
-	}
-	b.waiters = 0
-}
-
-func (b *broadcast) wait() {
-	b.waitersLock.Lock()
-	b.waiters++
-	b.waitersLock.Unlock()
-	<-b.signal
 }
 
 func (b *broadcast) Client() io.ReadCloser {
