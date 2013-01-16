@@ -123,16 +123,20 @@ func strongRuleFs() http.FileSystem {
 			sources: []string{"%.txt"},
 			recipe: func(task *task) error {
 				target := task.Target()
+				defer target.Close()
+				source := task.Source()
+				defer source.Close()
+
 				if _, err := target.Write([]byte("<strong>")); err != nil {
 					return err
 				}
-				if _, err := io.Copy(target, task.Source()); err != nil {
+				if _, err := io.Copy(target, source); err != nil {
 					return err
 				}
 				if _, err := target.Write([]byte("</strong>")); err != nil {
 					return err
 				}
-				target.Close()
+
 				return nil
 			},
 		},

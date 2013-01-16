@@ -64,7 +64,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 				return nil, err
 			}
 
-			task.source = &Source{file: sourceFile}
+			task.source = sourceFile
 		}
 	}
 
@@ -80,7 +80,6 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		if err := fs.rule.recipe(task); err != nil {
 			// what?
 		}
-		task.Source().file.Close()
 	}()
 
 	return newTargetFile(task.target.Client()), nil
@@ -168,22 +167,14 @@ func (file *targetFile) Stat() (os.FileInfo, error) {
 
 type task struct {
 	target *broadcast
-	source *Source
-}
-
-type Source struct {
-	file http.File
-}
-
-func (source *Source) Read(buf []byte) (int, error) {
-	return source.file.Read(buf)
+	source http.File
 }
 
 func (t *task) Target() io.WriteCloser {
 	return t.target
 }
 
-func (t *task) Source() *Source {
+func (t *task) Source() io.ReadCloser {
 	return t.source
 }
 
