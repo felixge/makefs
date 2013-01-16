@@ -2,7 +2,6 @@ package makefs
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -72,24 +71,22 @@ func TestRuleFs_Readdir(t *testing.T) {
 	}
 }
 
-func ExampleStat() {
+func TestRuleFs_Stat(t *testing.T) {
 	fs := strongRuleFs()
 	file, err := fs.Open("/foo.strong")
 	if err != nil {
-		fmt.Printf("Open: %#v", err)
-		return
+		t.Fatal(err)
 	}
 
 	stat, err := file.Stat()
 	if err != nil {
-		fmt.Printf("Err: %#v", err)
-		return
+		t.Fatal(err)
 	}
 
-	fmt.Print(stat)
-
-	// Output:
-	// fuck
+	name := stat.Name()
+	if name != "foo.strong" {
+		t.Errorf("bad name: %s", name)
+	}
 }
 
 var FindStemTests = []struct {
