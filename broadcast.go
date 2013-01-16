@@ -9,8 +9,6 @@ import (
 // Additionally it caches all writes, so that new clients won't miss any
 // data.
 type broadcast struct {
-	clientsLock sync.RWMutex
-	clients     []*client
 	cacheLock   *sync.RWMutex
 	cacheUpdate *sync.Cond
 	cache       []byte
@@ -50,11 +48,7 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 }
 
 func (b *broadcast) Client() io.ReadCloser {
-	client := &client{broadcast: b}
-	b.clientsLock.Lock()
-	b.clients = append(b.clients, client)
-	b.clientsLock.Unlock()
-	return client
+	return &client{broadcast: b}
 }
 
 type client struct {
