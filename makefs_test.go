@@ -18,7 +18,7 @@ var (
 	fixturesDir         = __dirname + "/fixtures"
 )
 
-func TestMakeFs(t *testing.T) {
+func TestMakeFs_Make(t *testing.T) {
 	fs := NewFs(http.Dir(fixturesDir))
 	fs.Make("%.sha1", "%.txt", func(t *task) error {
 		hash := sha1.New()
@@ -48,6 +48,28 @@ func TestMakeFs(t *testing.T) {
 		fmt.Printf("unexpected: %s\n", got)
 	}
 }
+
+func TestMakeFs_ExecMake(t *testing.T) {
+	fs := NewFs(http.Dir(fixturesDir))
+	fs.ExecMake("%.sha1", "%.txt", "cut", "-c", "1-11")
+
+	file, err := fs.Open("/foo.sha1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, file); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "May the foo\n"
+	got := buf.String()
+	if got != expected {
+		fmt.Printf("unexpected: %s\n", got)
+	}
+}
+
 
 func TestRuleFs_Read(t *testing.T) {
 	fs := strongRuleFs()

@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -50,6 +51,22 @@ func (fs *Fs) MakeMulti(targets []string, sources []string, recipe Recipe) {
 func (fs *Fs) Make(target string, source string, recipe Recipe) {
 	fs.MakeMulti([]string{target}, []string{source}, recipe)
 }
+
+func (fs *Fs) ExecMake(target string, source string, command string, args... string) {
+	fs.Make(target, source, func(task *task) error {
+		defer task.Source().Close()
+		defer task.Target().Close()
+
+		cmd := exec.Command(command, args...)
+		cmd.Stdin = task.Source()
+		cmd.Stdout = task.Target()
+		cmd.Stderr = task.Target()
+
+		return cmd.Run()
+	})
+}
+
+
 
 type ruleFs struct {
 	parent http.FileSystem
