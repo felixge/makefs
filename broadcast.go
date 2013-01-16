@@ -36,10 +36,11 @@ func (b *broadcast) Write(buf []byte) (int, error) {
 
 func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 	b.cacheLock.RLock()
+	defer b.cacheLock.RUnlock()
+
 	for {
 		if int(offset) < len(b.cache) {
 			n := copy(buf, b.cache[offset:])
-			b.cacheLock.RUnlock()
 			return n, nil
 		}
 
