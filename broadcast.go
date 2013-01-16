@@ -67,7 +67,7 @@ func (b *broadcast) Close() error {
 	return nil
 }
 
-func (b *broadcast) Client() io.ReadCloser {
+func (b *broadcast) Client() io.Reader {
 	return &client{broadcast: b}
 }
 
@@ -80,8 +80,4 @@ func (c *client) Read(buf []byte) (int, error) {
 	n, err := c.broadcast.ReadAt(buf, c.offset)
 	c.offset += int64(n)
 	return n, err
-}
-
-func (c *client) Close() error {
-	return nil
 }
