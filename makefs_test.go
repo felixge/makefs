@@ -2,6 +2,8 @@ package makefs
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -13,7 +15,39 @@ import (
 var (
 	_, __filename, _, _ = runtime.Caller(0)
 	__dirname           = filepath.Dir(__filename)
+	fixturesDir         = __dirname + "/fixtures"
 )
+
+func TestMakeFs(t *testing.T) {
+	fs := NewFs(http.Dir(fixturesDir))
+	fs.Make("%.sha1", "%.txt", func(t *task) error {
+		hash := sha1.New()
+		if _, err := io.Copy(hash, t.Source()); err != nil {
+			return err
+		}
+		if _, err := t.Target().Write(hash.Sum(nil)); err != nil {
+			return err
+		}
+		t.Target().Close()
+		return nil
+	})
+
+	file, err := fs.Open("/foo.sha1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, file); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "781b3017fe23bf261d65a6c3ed4d1af59dea790f"
+	got := fmt.Sprintf("%x", buf)
+	if got != expected {
+		fmt.Printf("unexpected: %s\n", got)
+	}
+}
 
 func TestRuleFs_Read(t *testing.T) {
 	fs := strongRuleFs()
@@ -27,7 +61,7 @@ func TestRuleFs_Read(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := "<strong>May the foo be with you!\n</strong>"
+	expected := "<strong>May the foo be with you.\n</strong>"
 	if buf.String() != expected {
 		t.Fatalf("unexpected result: %s", buf)
 	}
@@ -112,7 +146,7 @@ func Test_findStem(t *testing.T) {
 
 func strongRuleFs() http.FileSystem {
 	fs := &ruleFs{
-		parent: http.Dir(__dirname + "/fixtures"),
+		parent: http.Dir(fixturesDir),
 		rule: &rule{
 			targets: []string{"%.strong"},
 			sources: []string{"%.txt"},

@@ -22,6 +22,31 @@ import (
 	"time"
 )
 
+func NewFs(base http.FileSystem) *Fs {
+	return &Fs{head: base}
+}
+
+type Fs struct {
+	head http.FileSystem
+}
+
+func (fs *Fs) Open(path string) (http.File, error) {
+	return fs.head.Open(path)
+}
+
+func (fs *Fs) Make(target string, source string, recipe Recipe) {
+	rule := &rule{
+		targets: []string{target},
+		sources: []string{source},
+		recipe: recipe,
+	}
+
+	fs.head = &ruleFs{
+		parent: fs.head,
+		rule: rule,
+	}
+}
+
 type ruleFs struct {
 	parent http.FileSystem
 	rule   *rule
@@ -280,8 +305,10 @@ func (t *task) Source() io.ReadCloser {
 	return t.source
 }
 
+type Recipe func(*task) error
+
 type rule struct {
 	targets []string
 	sources []string
-	recipe  func(*task) error
+	recipe  Recipe
 }
