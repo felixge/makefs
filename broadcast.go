@@ -63,7 +63,7 @@ func (b *broadcast) Close() error {
 	return nil
 }
 
-func (b *broadcast) Client() io.Reader {
+func (b *broadcast) Client() *client {
 	return &client{broadcast: b}
 }
 

@@ -34,18 +34,22 @@ func TestRuleFs_Read(t *testing.T) {
 	}
 }
 
-func ExampleReaddir() {
+func TestRuleFs_Readdir(t *testing.T) {
 	fs := strongRuleFs()
 	dir, err := fs.Open("/")
 	if err != nil {
-		fmt.Printf("Open: %#v", err)
-		return
+		t.Fatal(err)
 	}
+
+	fmt.Printf("dir: %#v\n", dir)
 
 	stats, err := dir.Readdir(0)
 	if err != nil {
-		fmt.Printf("Readdir: %#v", err)
-		return
+		t.Fatal(err)
+	}
+
+	expected := map[string]int64{
+		"foo.strong": -1,
 	}
 
 	for _, stat := range stats {
@@ -53,11 +57,21 @@ func ExampleReaddir() {
 		if name[0] == '.' {
 			continue
 		}
-		fmt.Printf("%s\n", name)
+
+		size := stat.Size()
+		if expectedSize, ok := expected[name]; !ok {
+			t.Errorf("unexpected file: %s", name)
+			continue
+		} else if expectedSize != size {
+			t.Errorf("got size: %d, expected: %d for: %s", size, expectedSize, name)
+		}
+
+		delete(expected, name)
 	}
 
-	// Output:
-	// foo.strong
+	for name, _ := range expected {
+		t.Errorf("missing file: %s", name)
+	}
 }
 
 func ExampleStat() {
@@ -89,6 +103,7 @@ var FindStemTests = []struct {
 	{Str: "foo.txt", Pattern: "foo.%", Expect: "txt"},
 	{Str: "a.b.c", Pattern: "a.%.c", Expect: "b"},
 	{Str: "foo.txt", Pattern: ".txt", Expect: ""},
+	{Str: "/", Pattern: "%.txt", Expect: ""},
 }
 
 func Test_findStem(t *testing.T) {

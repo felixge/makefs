@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"syscall"
 )
 
 type ruleFs struct {
@@ -28,7 +27,7 @@ type ruleFs struct {
 //var errUndefined := fmt.Errorf("")
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
-	task := &task{target: newBroadcast()}
+	task := &task{}
 
 	if len(fs.rule.targets) > 1 {
 		return nil, fmt.Errorf("not done yet: multiple targets")
@@ -50,6 +49,8 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 			break
 		}
 
+		task.target = newBroadcast()
+
 		for _, source := range fs.rule.sources {
 			if !isPattern(source) {
 				return nil, fmt.Errorf("not done yet: non-pattern sources")
@@ -57,7 +58,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 
 			sourcePath := insertStem(source, stem)
 			sourceFile, err := fs.parent.Open(sourcePath)
-			if isNotFound(err) {
+			if os.IsNotExist(err) {
 				return nil, fmt.Errorf("not done yet: pattern source not found")
 			} else if err != nil {
 				return nil, err
@@ -67,20 +68,26 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		}
 	}
 
+	if task.target == nil {
+		file, err := fs.parent.Open(path)
+		if file == nil {
+			return file, err
+		}
+		return &proxyFile{File: file, ruleFs: fs}, err
+	}
+
 	go func() {
-		fs.rule.recipe(task)
+		if err := fs.rule.recipe(task); err != nil {
+			// what?
+		}
 		task.Source().file.Close()
 	}()
 
-	return &proxyFile{reader: task.target.Client()}, nil
+	return newTargetFile(task.target.Client()), nil
 }
 
 func (fs *ruleFs) readdir(file *proxyFile, count int) ([]os.FileInfo, error) {
-	return file.parent.Readdir(count)
-}
-
-func (fs *ruleFs) stat(file *proxyFile) (os.FileInfo, error) {
-	return file.parent.Stat()
+	return file.File.Readdir(count)
 }
 
 func isPattern(str string) bool {
@@ -102,7 +109,7 @@ func findStem(str string, pattern string) string {
 		return ""
 	}
 
-	if str[len(str)-len(suffix):] != suffix {
+	if len(str) < len(suffix) || str[len(str)-len(suffix):] != suffix {
 		return ""
 	}
 
@@ -117,49 +124,51 @@ func isGlob(str string) bool {
 	return strings.Contains(str, "*")
 }
 
-func isNotFound(err error) bool {
-	pathErr, ok := err.(*os.PathError)
-	if !ok {
-		return false
-	}
-
-	return pathErr.Err == syscall.ENOENT
-}
-
 type proxyFile struct {
+	http.File
 	ruleFs *ruleFs
-	path   string
-	reader io.Reader
-
-	parent http.File
-}
-
-func (file *proxyFile) Close() error {
-	return fmt.Errorf("close not implemented yet")
-}
-
-func (file *proxyFile) Read(buf []byte) (int, error) {
-	return file.reader.Read(buf)
-}
-
-func (file *proxyFile) Seek(offset int64, whence int) (int64, error) {
-	return 0, fmt.Errorf("eseek not implemented yet")
 }
 
 func (file *proxyFile) Readdir(count int) ([]os.FileInfo, error) {
 	return file.ruleFs.readdir(file, count)
 }
 
-func (file *proxyFile) Stat() (os.FileInfo, error) {
-	return file.ruleFs.stat(file)
+func newTargetFile(reader *client) *targetFile {
+	return &targetFile{
+		reader: reader,
+	}
+}
+
+type targetFile struct {
+	ruleFs *ruleFs
+	reader *client
+}
+
+func (file *targetFile) Close() error {
+	return fmt.Errorf("not done yet: Close()")
+}
+
+func (file *targetFile) Read(buf []byte) (int, error) {
+	return file.reader.Read(buf)
+}
+
+func (file *targetFile) Seek(offset int64, whence int) (int64, error) {
+	return 0, fmt.Errorf("not done yet: Seek()")
+}
+
+func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
+	// @TODO is there something more idomatic we can return here that makes sense
+	// cross-plattform?
+	return nil, fmt.Errorf("readdir: target file is not a dir")
+}
+
+func (file *targetFile) Stat() (os.FileInfo, error) {
+	return nil, fmt.Errorf("not done yet: Stat()")
 }
 
 type task struct {
 	target *broadcast
 	source *Source
-}
-
-type Target struct {
 }
 
 type Source struct {
