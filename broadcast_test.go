@@ -1,6 +1,7 @@
 package makefs
 
 import (
+	"io"
 	"testing"
 )
 
@@ -44,6 +45,7 @@ func TestBroadcast(t *testing.T) {
 
 	go func() {
 		broadcast.Write([]byte("jkl"))
+		broadcast.Close()
 	}()
 
 	if n, err := b.Read(bData); err != nil {
@@ -56,5 +58,13 @@ func TestBroadcast(t *testing.T) {
 		t.Fatal(err)
 	} else if (string(aData[0:n]) != "jkl") {
 		t.Fatalf("unexpected data: %s", aData[0:n])
+	}
+
+	if _, err := a.Read(aData); err != io.EOF {
+		t.Fatal(err)
+	}
+
+	if _, err := b.Read(bData); err != io.EOF {
+		t.Fatal(err)
 	}
 }

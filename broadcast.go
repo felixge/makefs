@@ -12,6 +12,7 @@ type broadcast struct {
 	cacheLock   *sync.RWMutex
 	cacheUpdate *sync.Cond
 	cache       []byte
+	closed      bool
 }
 
 func newBroadcast() *broadcast {
@@ -41,10 +42,24 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 			return copy(buf, b.cache[offset:]), nil
 		}
 
+		if b.closed {
+			return 0, io.EOF
+		}
+
 		// aquires a new RLock() before returning
 		b.cacheUpdate.Wait()
 	}
 	panic("unreachable")
+}
+
+func (b *broadcast) Close() error {
+	b.cacheLock.Lock();
+	b.closed = true
+	b.cacheLock.Unlock();
+
+	b.cacheUpdate.Broadcast()
+
+	return nil
 }
 
 func (b *broadcast) Client() io.ReadCloser {
