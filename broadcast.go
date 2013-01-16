@@ -9,18 +9,16 @@ import (
 // Additionally it caches all writes, so that new clients won't miss any
 // data.
 type broadcast struct {
-	cacheLock   *sync.RWMutex
-	cacheUpdate *sync.Cond
+	cacheLock   sync.RWMutex
+	cacheUpdate sync.Cond
 	cache       []byte
 	closed      bool
 }
 
 func newBroadcast() *broadcast {
-	cacheLock := &sync.RWMutex{}
-	return &broadcast{
-		cacheLock:   cacheLock,
-		cacheUpdate: sync.NewCond(cacheLock.RLocker()),
-	}
+	b := new(broadcast)
+	b.cacheUpdate.L = b.cacheLock.RLocker()
+	return b
 }
 
 func (b *broadcast) Write(buf []byte) (int, error) {
