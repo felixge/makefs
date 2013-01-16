@@ -67,4 +67,8 @@ func TestBroadcast(t *testing.T) {
 	if _, err := b.Read(bData); err != io.EOF {
 		t.Fatal(err)
 	}
+
+	if _, err := broadcast.Write([]byte("should not work")); err != io.ErrClosedPipe {
+		t.Fatal(err)
+	}
 }

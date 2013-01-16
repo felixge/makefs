@@ -25,6 +25,11 @@ func newBroadcast() *broadcast {
 
 func (b *broadcast) Write(buf []byte) (int, error) {
 	b.cacheLock.Lock()
+	if (b.closed) {
+		b.cacheLock.Unlock()
+		return 0, io.ErrClosedPipe
+	}
+
 	b.cache = append(b.cache, buf...)
 	b.cacheLock.Unlock()
 
