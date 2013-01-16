@@ -40,8 +40,7 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 
 	for {
 		if int(offset) < len(b.cache) {
-			n := copy(buf, b.cache[offset:])
-			return n, nil
+			return copy(buf, b.cache[offset:]), nil
 		}
 
 		// aquires a new RLock() before returning
