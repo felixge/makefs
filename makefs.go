@@ -54,9 +54,6 @@ func (fs *Fs) Make(target string, source string, recipe Recipe) {
 
 func (fs *Fs) ExecMake(target string, source string, command string, args... string) {
 	fs.Make(target, source, func(task *task) error {
-		defer task.Source().Close()
-		defer task.Target().Close()
-
 		cmd := exec.Command(command, args...)
 		cmd.Stdin = task.Source()
 		cmd.Stdout = task.Target()
@@ -65,8 +62,6 @@ func (fs *Fs) ExecMake(target string, source string, command string, args... str
 		return cmd.Run()
 	})
 }
-
-
 
 type ruleFs struct {
 	parent http.FileSystem
@@ -130,6 +125,9 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		if err := fs.rule.recipe(task); err != nil {
 			// what?
 		}
+
+		task.source.Close()
+		task.target.Close()
 	}()
 
 	return newTargetFile(task.target, path), nil
@@ -318,11 +316,11 @@ type task struct {
 	source http.File
 }
 
-func (t *task) Target() io.WriteCloser {
+func (t *task) Target() io.Writer {
 	return t.target
 }
 
-func (t *task) Source() io.ReadCloser {
+func (t *task) Source() io.Reader {
 	return t.source
 }
 

@@ -28,7 +28,6 @@ func TestMakeFs_Make(t *testing.T) {
 		if _, err := t.Target().Write(hash.Sum(nil)); err != nil {
 			return err
 		}
-		t.Target().Close()
 		return nil
 	})
 
@@ -174,9 +173,7 @@ func strongRuleFs() http.FileSystem {
 			sources: []string{"%.txt"},
 			recipe: func(task *task) error {
 				target := task.Target()
-				defer target.Close()
 				source := task.Source()
-				defer source.Close()
 
 				if _, err := target.Write([]byte("<strong>")); err != nil {
 					return err
