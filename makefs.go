@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,12 +40,12 @@ func (fs *Fs) MakeMulti(targets []string, sources []string, recipe Recipe) {
 	rule := &rule{
 		targets: targets,
 		sources: sources,
-		recipe: recipe,
+		recipe:  recipe,
 	}
 
 	fs.head = &ruleFs{
 		parent: fs.head,
-		rule: rule,
+		rule:   rule,
 	}
 }
 
@@ -52,7 +53,7 @@ func (fs *Fs) Make(target string, source string, recipe Recipe) {
 	fs.MakeMulti([]string{target}, []string{source}, recipe)
 }
 
-func (fs *Fs) ExecMake(target string, source string, command string, args... string) {
+func (fs *Fs) ExecMake(target string, source string, command string, args ...string) {
 	fs.Make(target, source, func(task *task) error {
 		cmd := exec.Command(command, args...)
 		cmd.Stdin = task.Source()
@@ -120,14 +121,13 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		return &proxyFile{File: file, ruleFs: fs, path: path}, err
 	}
 
-	// @TODO, do not execute recipe until first Read() ?
-	go func() {
+	task.runFunc = func() {
 		err := fs.rule.recipe(task)
 		task.target.CloseWithError(err)
 		task.source.Close()
-	}()
+	}
 
-	return newTargetFile(task.target, path), nil
+	return newTargetFile(task, path), nil
 }
 
 func (fs *ruleFs) readdir(file *proxyFile, count int) ([]os.FileInfo, error) {
@@ -228,19 +228,18 @@ func (file *proxyFile) Readdir(count int) ([]os.FileInfo, error) {
 	return file.ruleFs.readdir(file, count)
 }
 
-func newTargetFile(broadcast *broadcast, path string) *targetFile {
+func newTargetFile(task *task, path string) *targetFile {
 	return &targetFile{
-		reader:    broadcast.Client(),
-		broadcast: broadcast,
-		path:      path,
+		task: task,
+		path: path,
 	}
 }
 
 type targetFile struct {
-	ruleFs    *ruleFs
-	reader    *client
-	broadcast *broadcast
-	path      string
+	task   *task
+	path   string
+	reader io.Reader
+	once   sync.Once
 }
 
 func (file *targetFile) Close() error {
@@ -249,6 +248,9 @@ func (file *targetFile) Close() error {
 }
 
 func (file *targetFile) Read(buf []byte) (int, error) {
+	if file.reader == nil {
+		file.reader = file.client()
+	}
 	return file.reader.Read(buf)
 }
 
@@ -265,6 +267,11 @@ func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
 func (file *targetFile) Stat() (os.FileInfo, error) {
 	stat := &targetStat{targetFile: file}
 	return stat, nil
+}
+
+func (file *targetFile) client() io.Reader {
+	file.once.Do(func() { file.task.start() })
+	return file.task.target.Client()
 }
 
 type targetStat struct {
@@ -296,7 +303,7 @@ func (s *targetStat) Name() string {
 //
 // This means that calling this methods requires executing the recipe.
 func (s *targetStat) Size() int64 {
-	client := s.targetFile.broadcast.Client()
+	client := s.targetFile.client()
 	n, err := io.Copy(ioutil.Discard, client)
 	if err != nil {
 		return -1
@@ -309,8 +316,9 @@ func (s *targetStat) Sys() interface{} {
 }
 
 type task struct {
-	target *broadcast
-	source http.File
+	runFunc func()
+	target  *broadcast
+	source  http.File
 }
 
 func (t *task) Target() io.Writer {
@@ -319,6 +327,10 @@ func (t *task) Target() io.Writer {
 
 func (t *task) Source() io.Reader {
 	return t.source
+}
+
+func (t *task) start() {
+	go t.runFunc()
 }
 
 type Recipe func(*task) error
