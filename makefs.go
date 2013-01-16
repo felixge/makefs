@@ -202,6 +202,30 @@ type targetFile struct {
 	path      string
 }
 
+func (file *targetFile) Close() error {
+	// @TODO make future read calls fail
+	return nil
+}
+
+func (file *targetFile) Read(buf []byte) (int, error) {
+	return file.reader.Read(buf)
+}
+
+func (file *targetFile) Seek(offset int64, whence int) (int64, error) {
+	return 0, fmt.Errorf("not done yet: Seek()")
+}
+
+func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
+	// @TODO is there something more idomatic we can return here that makes sense
+	// cross-plattform?
+	return nil, fmt.Errorf("readdir: target file is not a dir")
+}
+
+func (file *targetFile) Stat() (os.FileInfo, error) {
+	stat := &targetStat{targetFile: file}
+	return stat, nil
+}
+
 type targetStat struct {
 	targetFile *targetFile
 }
@@ -241,29 +265,6 @@ func (s *targetStat) Size() int64 {
 
 func (s *targetStat) Sys() interface{} {
 	return nil
-}
-
-func (file *targetFile) Close() error {
-	return fmt.Errorf("not done yet: Close()")
-}
-
-func (file *targetFile) Read(buf []byte) (int, error) {
-	return file.reader.Read(buf)
-}
-
-func (file *targetFile) Seek(offset int64, whence int) (int64, error) {
-	return 0, fmt.Errorf("not done yet: Seek()")
-}
-
-func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
-	// @TODO is there something more idomatic we can return here that makes sense
-	// cross-plattform?
-	return nil, fmt.Errorf("readdir: target file is not a dir")
-}
-
-func (file *targetFile) Stat() (os.FileInfo, error) {
-	stat := &targetStat{targetFile: file}
-	return stat, nil
 }
 
 type task struct {
