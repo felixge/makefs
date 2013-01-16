@@ -24,7 +24,7 @@ func newBroadcast() *broadcast {
 func (b *broadcast) Write(buf []byte) (int, error) {
 	b.cacheLock.Lock()
 	defer b.cacheLock.Unlock()
-	if (b.closed) {
+	if b.closed {
 		return 0, io.ErrClosedPipe
 	}
 
@@ -54,8 +54,8 @@ func (b *broadcast) ReadAt(buf []byte, offset int64) (int, error) {
 }
 
 func (b *broadcast) Close() error {
-	b.cacheLock.Lock();
-	defer b.cacheLock.Unlock();
+	b.cacheLock.Lock()
+	defer b.cacheLock.Unlock()
 
 	b.closed = true
 	b.cacheUpdate.Broadcast()

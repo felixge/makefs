@@ -13,7 +13,7 @@ func TestBroadcast(t *testing.T) {
 	aData := make([]byte, 512)
 	if n, err := a.Read(aData); err != nil {
 		t.Fatal(err)
-	} else if (string(aData[0:n]) != "abc") {
+	} else if string(aData[0:n]) != "abc" {
 		t.Fatalf("unexpected data: %s", aData[0:n])
 	}
 
@@ -23,7 +23,7 @@ func TestBroadcast(t *testing.T) {
 	bData := make([]byte, 512)
 	if n, err := b.Read(bData); err != nil {
 		t.Fatal(err)
-	} else if (string(bData[0:n]) != "abcde") {
+	} else if string(bData[0:n]) != "abcde" {
 		t.Fatalf("unexpected data: %s", bData[0:n])
 	}
 
@@ -33,13 +33,13 @@ func TestBroadcast(t *testing.T) {
 
 	if n, err := b.Read(bData); err != nil {
 		t.Fatal(err)
-	} else if (string(bData[0:n]) != "fghi") {
+	} else if string(bData[0:n]) != "fghi" {
 		t.Fatalf("unexpected data: %s", bData[0:n])
 	}
 
 	if n, err := a.Read(aData); err != nil {
 		t.Fatal(err)
-	} else if (string(aData[0:n]) != "defghi") {
+	} else if string(aData[0:n]) != "defghi" {
 		t.Fatalf("unexpected data: %s", aData[0:n])
 	}
 
@@ -50,13 +50,13 @@ func TestBroadcast(t *testing.T) {
 
 	if n, err := b.Read(bData); err != nil {
 		t.Fatal(err)
-	} else if (string(bData[0:n]) != "jkl") {
+	} else if string(bData[0:n]) != "jkl" {
 		t.Fatalf("unexpected data: %s", bData[0:n])
 	}
 
 	if n, err := a.Read(aData); err != nil {
 		t.Fatal(err)
-	} else if (string(aData[0:n]) != "jkl") {
+	} else if string(aData[0:n]) != "jkl" {
 		t.Fatalf("unexpected data: %s", aData[0:n])
 	}
 

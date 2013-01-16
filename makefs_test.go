@@ -41,15 +41,13 @@ func TestRuleFs_Readdir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("dir: %#v\n", dir)
-
 	stats, err := dir.Readdir(0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expected := map[string]int64{
-		"foo.strong": -1,
+		"foo.strong": 42,
 	}
 
 	for _, stat := range stats {

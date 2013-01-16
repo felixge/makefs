@@ -14,9 +14,12 @@ Vocabulary:
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 type ruleFs struct {
@@ -73,20 +76,71 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		if file == nil {
 			return file, err
 		}
-		return &proxyFile{File: file, ruleFs: fs}, err
+		return &proxyFile{File: file, ruleFs: fs, path: path}, err
 	}
 
+	// @TODO, do not execute recipe until first Read() ?
 	go func() {
 		if err := fs.rule.recipe(task); err != nil {
 			// what?
 		}
 	}()
 
-	return newTargetFile(task.target.Client()), nil
+	return newTargetFile(task.target, path), nil
 }
 
 func (fs *ruleFs) readdir(file *proxyFile, count int) ([]os.FileInfo, error) {
-	return file.File.Readdir(count)
+	if len(fs.rule.targets) > 1 {
+		return nil, fmt.Errorf("not done yet: multiple targets")
+	}
+
+	if len(fs.rule.sources) > 1 {
+		return nil, fmt.Errorf("not done yet: multiple sources")
+	}
+
+	stats, err := file.File.Readdir(count)
+	if err != nil {
+		return nil, err
+	}
+
+	results := []os.FileInfo{}
+	for _, stat := range stats {
+		for _, source := range fs.rule.sources {
+			if !isPattern(source) {
+				return nil, fmt.Errorf("not done yet: non-pattern sources")
+			}
+
+			stem := findStem(filepath.Join(file.path, stat.Name()), source)
+
+			// source pattern did not match, break inner loop
+			if stem == "" {
+				results = append(results, stat)
+				break
+			}
+
+			for _, target := range fs.rule.targets {
+				if !isPattern(target) {
+					return nil, fmt.Errorf("not done yet: non-pattern targets")
+				}
+
+				targetPath := insertStem(target, stem)
+				targetFile, err := fs.Open(targetPath)
+				if err != nil {
+					return nil, err
+				}
+				defer targetFile.Close()
+
+				targetStat, err := targetFile.Stat()
+				if err != nil {
+					return nil, err
+				}
+
+				results = append(results, targetStat)
+			}
+		}
+	}
+
+	return results, nil
 }
 
 func isPattern(str string) bool {
@@ -125,6 +179,7 @@ func isGlob(str string) bool {
 
 type proxyFile struct {
 	http.File
+	path   string
 	ruleFs *ruleFs
 }
 
@@ -132,15 +187,60 @@ func (file *proxyFile) Readdir(count int) ([]os.FileInfo, error) {
 	return file.ruleFs.readdir(file, count)
 }
 
-func newTargetFile(reader *client) *targetFile {
+func newTargetFile(broadcast *broadcast, path string) *targetFile {
 	return &targetFile{
-		reader: reader,
+		reader:    broadcast.Client(),
+		broadcast: broadcast,
+		path:      path,
 	}
 }
 
 type targetFile struct {
-	ruleFs *ruleFs
-	reader *client
+	ruleFs    *ruleFs
+	reader    *client
+	broadcast *broadcast
+	path      string
+}
+
+type targetStat struct {
+	targetFile *targetFile
+}
+
+func (s *targetStat) IsDir() bool {
+	// @TODO support targets that are directories
+	return false
+}
+
+func (s *targetStat) ModTime() time.Time {
+	// @TODO finish
+	return time.Now()
+}
+
+func (s *targetStat) Mode() os.FileMode {
+	// @TODO Finish
+	return 0
+}
+
+func (s *targetStat) Name() string {
+	return filepath.Base(s.targetFile.path)
+}
+
+// Size determines the size of the target file by creating a new broadcast
+// client, and counting the bytes until EOF. It returns -1 if the broadcast
+// client returns an error other than EOF from read.
+//
+// This means that calling this methods requires executing the recipe.
+func (s *targetStat) Size() int64 {
+	client := s.targetFile.broadcast.Client()
+	n, err := io.Copy(ioutil.Discard, client)
+	if err != nil {
+		return -1
+	}
+	return n
+}
+
+func (s *targetStat) Sys() interface{} {
+	return nil
 }
 
 func (file *targetFile) Close() error {
@@ -162,7 +262,8 @@ func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
 }
 
 func (file *targetFile) Stat() (os.FileInfo, error) {
-	return nil, fmt.Errorf("not done yet: Stat()")
+	stat := &targetStat{targetFile: file}
+	return stat, nil
 }
 
 type task struct {
