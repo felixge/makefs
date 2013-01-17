@@ -215,7 +215,7 @@ func findStem(str string, pattern string) string {
 	prefix := pattern[0:stemOffset]
 	suffix := pattern[stemOffset+1:]
 
-	if str[0:len(prefix)] != prefix {
+	if len(str) < len(prefix) || str[0:len(prefix)] != prefix {
 		return ""
 	}
 

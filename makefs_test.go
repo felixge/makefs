@@ -168,6 +168,7 @@ var FindStemTests = []struct {
 	{Str: "foo.txt", Pattern: "%.txt", Expect: "foo"},
 	{Str: "foo.txt", Pattern: "foo.%", Expect: "txt"},
 	{Str: "a.b.c", Pattern: "a.%.c", Expect: "b"},
+	{Str: "/pages", Pattern: "/public/%.html", Expect: ""},
 	{Str: "foo.txt", Pattern: ".txt", Expect: ""},
 	{Str: "/", Pattern: "%.txt", Expect: ""},
 }
