@@ -7,8 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"testing"
 	gopath "path"
+	"testing"
 )
 
 // RuleFsTests is a simple list that declares the tests ruleFs should pass.
@@ -27,7 +27,9 @@ var RuleFsTests = []struct {
 		Checks: []FsChecker{
 			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
 			&StatCheck{path: "/foo.sha1", size: 40},
-			&NotPresentCheck{"/foo.txt"},
+			&ExistCheck{"/foo.txt", false},
+			&ExistCheck{"/bar.sha1", true},
+			&ExistCheck{"/bar.txt", false},
 		},
 	},
 }
@@ -94,17 +96,29 @@ func (check *ReadCheck) Check(fs http.FileSystem) error {
 	return nil
 }
 
-// NotPresentCheck checks that no file is present at the given path. It
-// verifies this by calling Open() on the path, as well as Readdir() on the
-// parent directory.
-type NotPresentCheck struct{
-	path string
+// ExistCheck checks if a file is present or not. It verifies this by calling
+// Open() on the path, as well as Readdir() on the parent directory.
+type ExistCheck struct {
+	path        string
+	shouldExist bool
 }
 
-func (check *NotPresentCheck) Check(fs http.FileSystem) error {
+func (check *ExistCheck) Check(fs http.FileSystem) error {
 	_, err := fs.Open(check.path)
-	if !os.IsNotExist(err) {
-		return fmt.Errorf("unexpected err: %#v", err)
+
+	existErr := os.IsNotExist(err)
+	if (check.shouldExist ) {
+		if existErr {
+			return fmt.Errorf("should exist, but does not")
+		} else if err != nil {
+			return fmt.Errorf("should exist, but raises error: %#v", err)
+		}
+	} else {
+		if err == nil {
+			return fmt.Errorf("should not exist, but does")
+		} else if !existErr {
+			return fmt.Errorf("should not exist, but raises unexpected err: %#v", err)
+		}
 	}
 
 	dirPath := gopath.Dir(check.path)
@@ -119,15 +133,24 @@ func (check *NotPresentCheck) Check(fs http.FileSystem) error {
 	}
 
 	name := gopath.Base(check.path)
+	listed := false
+
 	for _, stat := range stats {
 		if stat.Name() == name {
-			return fmt.Errorf("Readdir returned: %s", name)
+			listed = true
+			break
 		}
+	}
+
+	if !check.shouldExist && listed {
+		return fmt.Errorf("should not be listed by Readdir, but is")
+	} else if check.shouldExist && !listed {
+		return fmt.Errorf("should be listed by Readdir, but is not")
 	}
 	return nil
 }
 
-type StatCheck struct{
+type StatCheck struct {
 	path string
 	size int64
 }
