@@ -51,7 +51,6 @@ func (fs *Fs) ExecMake(target string, source string, command string, args ...str
 		cmd.Stdin = task.Source()
 		cmd.Stdout = task.Target()
 		cmd.Stderr = task.Target()
-
 		return cmd.Run()
 	})
 }
