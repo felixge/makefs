@@ -32,22 +32,20 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		return nil, os.ErrNotExist
 	}
 
-	// path is not a taget, so we'll return whatever the parent fs has to offer.
-	// If the parent fs returns a file we'll proxy all Readdir calls on the file
-	// back to our ruleFs (as we need to apply our rule to them).
-	if !fs.isTarget(path) {
+	task, err := fs.task(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// No task means that the given path is not a target. However, it could be a
+	// directory, so we need to wrap any files returned by the parent fs,
+	// allowing us to proxy any Readdir calls back to this rulefs.
+	if task == nil {
 		file, err := fs.parent.Open(path)
 		if file == nil {
 			return nil, err
 		}
 		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
-	}
-
-	task, err := fs.task(path)
-
-	// something went wrong (invalid rule, source could not be opened, etc.).
-	if err != nil {
-		return nil, err
 	}
 
 	return newTargetFile(task, path), nil
@@ -92,21 +90,6 @@ func (fs *ruleFs) isSource(path string) bool {
 		}
 
 		stem := findStem(path, source)
-		if stem != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func (fs *ruleFs) isTarget(path string) bool {
-	for _, target := range fs.rule.targets {
-		// non-pattern targets not done yet
-		if !isPattern(target) {
-			return false
-		}
-
-		stem := findStem(path, target)
 		if stem != "" {
 			return true
 		}
