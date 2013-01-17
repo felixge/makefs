@@ -24,6 +24,7 @@ func (err errInvalidRule) Error() string {
 }
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
+	// refuse work if our rule is supported
 	if err := fs.checkRule(); err != nil {
 		return nil, err
 	}
