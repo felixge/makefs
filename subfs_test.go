@@ -28,7 +28,7 @@ func TestSubFs_Open(t *testing.T) {
 	}
 }
 
-func TestSubFs_OpenJail(t *testing.T) {
+func TestSubFs_Open_Jail(t *testing.T) {
 	fs := NewSubFs(http.Dir(fixturesDir), "/sub")
 	_, err := fs.Open("../foo.txt")
 	if err != os.ErrPermission {
