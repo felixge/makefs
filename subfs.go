@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func NewSubFs(base http.FileSystem, newRoot string) http.FileSystem {
+func NewSubFs(base http.FileSystem, newRoot string) *SubFs {
 	return &SubFs{base: base, root: newRoot}
 }
 
