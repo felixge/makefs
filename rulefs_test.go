@@ -2,86 +2,135 @@ package makefs
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 )
 
-func TestRuleFs_Read(t *testing.T) {
-	fs := strongRuleFs()
-	file, err := fs.Open("/foo.strong")
-	if err != nil {
-		t.Fatal(err)
+// RuleFsTests is a simple list that declares the tests ruleFs should pass.
+var RuleFsTests = []struct {
+	Name   string
+	Rule   *rule
+	Checks []FsChecker
+}{
+	{
+		Name: "pattern to pattern",
+		Rule: &rule{
+			targets: []string{"%.sha1"},
+			sources: []string{"%.txt"},
+			recipe:  Sha1Recipe,
+		},
+		Checks: []FsChecker{
+			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			&StatCheck{path: "/foo.sha1", size: 40},
+			&NotPresentCheck{"/foo.txt"},
+		},
+	},
+}
+
+// TestRuleFs_Tests executes the RuleFsTests declared above.
+func TestRuleFs_Tests(t *testing.T) {
+	for _, test := range RuleFsTests {
+		t.Logf("test: %s", test.Name)
+
+		fs := &ruleFs{
+			parent: http.Dir(fixturesDir),
+			rule:   test.Rule,
+		}
+
+		for _, check := range test.Checks {
+			if err := check.Check(fs); err != nil {
+				t.Errorf("%s in %#v", err, check)
+			}
+		}
+	}
+}
+
+// Sha1Recipe takes one source file and produces the sha1 sum as the target.
+var Sha1Recipe = func(t *Task) error {
+	hash := sha1.New()
+	if _, err := io.Copy(hash, t.Source()); err != nil {
+		return err
 	}
 
-	buf := &bytes.Buffer{}
+	hex := fmt.Sprintf("%x", hash.Sum(nil))
+
+	if _, err := io.WriteString(t.Target(), hex); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FsChecker is a simple interface for checking things inside a http.FileSystem
+type FsChecker interface {
+	Check(fs http.FileSystem) error
+}
+
+// ReadCheck checks the result of reading a file from the given path.
+type ReadCheck struct {
+	path     string
+	expected string
+}
+
+func (check *ReadCheck) Check(fs http.FileSystem) error {
+	file, err := fs.Open(check.path)
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
 	if _, err := io.Copy(buf, file); err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	expected := "<strong>May the foo be with you.\n</strong>"
-	if buf.String() != expected {
-		t.Fatalf("unexpected result: %s", buf)
+	got := buf.String()
+	if got != check.expected {
+		return fmt.Errorf("unexpected: %#v", got)
 	}
+	return nil
 }
 
-func TestRuleFs_Readdir(t *testing.T) {
-	fs := strongRuleFs()
-	dir, err := fs.Open("/")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stats, err := dir.Readdir(0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expected := map[string]int64{
-		"foo.strong": 42,
-		"sub":        -1,
-	}
-
-	for _, stat := range stats {
-		name := stat.Name()
-		if name[0] == '.' {
-			continue
-		}
-
-		size := stat.Size()
-		if expectedSize, ok := expected[name]; !ok {
-			t.Errorf("unexpected file: %s", name)
-			continue
-		} else if expectedSize == -1 {
-			// -1 means don't check the size on this file (used for dirs)
-		} else if expectedSize != size {
-			t.Errorf("got size: %d, expected: %d for: %s", size, expectedSize, name)
-		}
-
-		delete(expected, name)
-	}
-
-	for name, _ := range expected {
-		t.Errorf("missing file: %s", name)
-	}
+// NotPresentCheck checks that no file is present at the given path. It
+// verifies this by calling Open() on the path, as well as Readdir() on the
+// parent directory.
+//
+// @TODO(felixge) Readdir check
+type NotPresentCheck struct{
+	path string
 }
 
-func TestRuleFs_Stat(t *testing.T) {
-	fs := strongRuleFs()
-	file, err := fs.Open("/foo.strong")
+func (check *NotPresentCheck) Check(fs http.FileSystem) error {
+	_, err := fs.Open(check.path)
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("unexpected err: %#v", err)
+	}
+	return nil
+}
+
+type StatCheck struct{
+	path string
+	size int64
+}
+
+func (check *StatCheck) Check(fs http.FileSystem) error {
+	file, err := fs.Open(check.path)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	stat, err := file.Stat()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	name := stat.Name()
-	if name != "foo.strong" {
-		t.Errorf("bad name: %s", name)
+	got := stat.Size()
+	if got != check.size {
+		return fmt.Errorf("unexpected size: %d", got)
 	}
+	return nil
 }
 
 var FindStemTests = []struct {
@@ -104,31 +153,4 @@ func Test_findStem(t *testing.T) {
 			t.Errorf("expected stem: %s, got: %s (%+v)", test.Expect, stem, test)
 		}
 	}
-}
-
-func strongRuleFs() http.FileSystem {
-	fs := &ruleFs{
-		parent: http.Dir(fixturesDir),
-		rule: &rule{
-			targets: []string{"%.strong"},
-			sources: []string{"%.txt"},
-			recipe: func(task *Task) error {
-				target := task.Target()
-				source := task.Source()
-
-				if _, err := target.Write([]byte("<strong>")); err != nil {
-					return err
-				}
-				if _, err := io.Copy(target, source); err != nil {
-					return err
-				}
-				if _, err := target.Write([]byte("</strong>")); err != nil {
-					return err
-				}
-
-				return nil
-			},
-		},
-	}
-	return fs
 }
