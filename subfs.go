@@ -2,7 +2,9 @@ package makefs
 
 import (
 	"net/http"
+	"os"
 	gopath "path"
+	"strings"
 )
 
 func NewSubFs(base http.FileSystem, path string) http.FileSystem {
@@ -15,6 +17,9 @@ type SubFs struct {
 }
 
 func (fs *SubFs) Open(path string) (http.File, error) {
-	subPath := gopath.Join(fs.path, gopath.Clean("/"+path))
+	subPath := gopath.Join(fs.path, path)
+	if !strings.HasPrefix(subPath, fs.path) {
+		return nil, os.ErrPermission
+	}
 	return fs.base.Open(subPath)
 }

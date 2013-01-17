@@ -31,9 +31,7 @@ func TestSubFs_Open(t *testing.T) {
 func TestSubFs_OpenJail(t *testing.T) {
 	fs := NewSubFs(http.Dir(fixturesDir), "/sub")
 	_, err := fs.Open("../foo.txt")
-	if err == nil {
-		t.Fatal("insecure jail")
-	} else if !os.IsNotExist(err) {
-		t.Fatal("wrong error type", err)
+	if err != os.ErrPermission {
+		t.Fatal("wrong error", err)
 	}
 }
