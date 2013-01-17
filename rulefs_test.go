@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	gopath "path"
 )
 
 // RuleFsTests is a simple list that declares the tests ruleFs should pass.
@@ -96,8 +97,6 @@ func (check *ReadCheck) Check(fs http.FileSystem) error {
 // NotPresentCheck checks that no file is present at the given path. It
 // verifies this by calling Open() on the path, as well as Readdir() on the
 // parent directory.
-//
-// @TODO(felixge) Readdir check
 type NotPresentCheck struct{
 	path string
 }
@@ -106,6 +105,24 @@ func (check *NotPresentCheck) Check(fs http.FileSystem) error {
 	_, err := fs.Open(check.path)
 	if !os.IsNotExist(err) {
 		return fmt.Errorf("unexpected err: %#v", err)
+	}
+
+	dirPath := gopath.Dir(check.path)
+	dirFile, err := fs.Open(dirPath)
+	if err != nil {
+		return err
+	}
+
+	stats, err := dirFile.Readdir(0)
+	if err != nil {
+		return err
+	}
+
+	name := gopath.Base(check.path)
+	for _, stat := range stats {
+		if stat.Name() == name {
+			return fmt.Errorf("Readdir returned: %s", name)
+		}
 	}
 	return nil
 }
