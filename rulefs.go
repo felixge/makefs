@@ -54,38 +54,26 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 }
 
 func (fs *ruleFs) task(path string) (*Task, error) {
-	task := &Task{}
+	target := fs.rule.targets[0]
+	stem := findStem(path, target)
 
-	for _, target := range fs.rule.targets {
-		if !isPattern(target) {
-			return nil, fmt.Errorf("not done yet: non-pattern targets")
-		}
-
-		stem := findStem(path, target)
-
-		// target pattern did not match, no task can be synthesized
-		if stem == "" {
-			return nil, nil
-		}
-
-		task.target = newBroadcast()
-
-		for _, source := range fs.rule.sources {
-			if !isPattern(source) {
-				return nil, fmt.Errorf("not done yet: non-pattern sources")
-			}
-
-			sourcePath := insertStem(source, stem)
-			sourceFile, err := fs.parent.Open(sourcePath)
-			if os.IsNotExist(err) {
-				return nil, fmt.Errorf("not done yet: pattern source not found")
-			} else if err != nil {
-				return nil, err
-			}
-
-			task.source = sourceFile
-		}
+	// target pattern did not match, no task can be synthesized
+	if stem == "" {
+		return nil, nil
 	}
+
+	task := &Task{target: newBroadcast()}
+
+	source := fs.rule.sources[0]
+	sourcePath := insertStem(source, stem)
+	sourceFile, err := fs.parent.Open(sourcePath)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("not done yet: pattern source not found")
+	} else if err != nil {
+		return nil, err
+	}
+
+	task.source = sourceFile
 
 	task.runFunc = func() {
 		err := fs.rule.recipe(task)
