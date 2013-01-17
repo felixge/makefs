@@ -239,7 +239,6 @@ type targetFile struct {
 	task   *task
 	path   string
 	reader io.Reader
-	once   sync.Once
 }
 
 func (file *targetFile) Close() error {
@@ -270,7 +269,8 @@ func (file *targetFile) Stat() (os.FileInfo, error) {
 }
 
 func (file *targetFile) client() io.Reader {
-	file.once.Do(func() { file.task.start() })
+	// make sure our recipe is executed
+	file.task.start()
 	return file.task.target.Client()
 }
 
@@ -317,6 +317,7 @@ func (s *targetStat) Sys() interface{} {
 
 type task struct {
 	runFunc func()
+	runOnce sync.Once
 	target  *broadcast
 	source  http.File
 }
@@ -329,8 +330,10 @@ func (t *task) Source() io.Reader {
 	return t.source
 }
 
+// start executes the recipe unless it has already started executing, in which
+// case the call is ignored.
 func (t *task) start() {
-	go t.runFunc()
+	go t.runOnce.Do(t.runFunc)
 }
 
 type Recipe func(*task) error
