@@ -18,6 +18,21 @@ var RuleFsTests = []struct {
 	Checks []FsChecker
 }{
 	{
+		Name: "path to path",
+		Rule: &rule{
+			targets: []string{"foo.sha1"},
+			sources: []string{"foo.txt"},
+			recipe:  Sha1Recipe,
+		},
+		Checks: []FsChecker{
+			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			//&StatCheck{path: "/foo.sha1", size: 40},
+			//&ExistCheck{"/foo.txt", false},
+			//&ExistCheck{"/bar.sha1", false},
+			//&ExistCheck{"/bar.txt", true},
+		},
+	},
+	{
 		Name: "pattern to pattern",
 		Rule: &rule{
 			targets: []string{"%.sha1"},

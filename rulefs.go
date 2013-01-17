@@ -17,9 +17,30 @@ type ruleFs struct {
 	rule   *rule
 }
 
+type errInvalidRule string
+
+func (err errInvalidRule) Error() string {
+	return "invalid rule: " + string(err)
+}
+
 func (fs *ruleFs) Open(path string) (http.File, error) {
+	if err := fs.checkRule(); err != nil {
+		return nil, err
+	}
+
 	if fs.isSource(path) {
 		return nil, os.ErrNotExist
+	}
+
+	// path is not a taget, so we'll return whatever the parent fs has to offer.
+	// If the parent fs returns a file we'll proxy all Readdir calls on the file
+	// back to our ruleFs (as we need to apply our rule to them).
+	if !fs.isTarget(path) {
+		file, err := fs.parent.Open(path)
+		if file == nil {
+			return nil, err
+		}
+		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
 	}
 
 	task, err := fs.task(path)
@@ -29,30 +50,11 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		return nil, err
 	}
 
-	// no task could be synthesized for the given path. In this case we'll return
-	// whatever the parent fs has to offer, but we'll proxy all Readdir calls on
-	// the file back to our ruleFs (as we need to apply our rule to them).
-	if task == nil {
-		file, err := fs.parent.Open(path)
-		if file == nil {
-			return nil, err
-		}
-		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
-	}
-
 	return newTargetFile(task, path), nil
 }
 
 func (fs *ruleFs) task(path string) (*Task, error) {
 	task := &Task{}
-
-	if len(fs.rule.targets) > 1 {
-		return nil, fmt.Errorf("not done yet: multiple targets")
-	}
-
-	if len(fs.rule.sources) > 1 {
-		return nil, fmt.Errorf("not done yet: multiple sources")
-	}
 
 	for _, target := range fs.rule.targets {
 		if !isPattern(target) {
@@ -109,13 +111,24 @@ func (fs *ruleFs) isSource(path string) bool {
 	return false
 }
 
-func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
-	if len(fs.rule.targets) > 1 {
-		return nil, fmt.Errorf("not done yet: multiple targets")
-	}
+func (fs *ruleFs) isTarget(path string) bool {
+	for _, target := range fs.rule.targets {
+		// non-pattern targets not done yet
+		if !isPattern(target) {
+			return false
+		}
 
-	if len(fs.rule.sources) > 1 {
-		return nil, fmt.Errorf("not done yet: multiple sources")
+		stem := findStem(path, target)
+		if stem != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
+	if err := fs.checkRule(); err != nil {
+		return nil, err
 	}
 
 	stats, err := file.File.Readdir(count)
@@ -161,6 +174,36 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 	}
 
 	return results, nil
+}
+
+// checkRule determines if the given rule can be executed by ruleFs. It will
+// return an error if the rule is invalid, or support for it has not been
+// implemented yet.
+func (fs *ruleFs) checkRule() error  {
+	// check if the rule itself is valid
+	if err := fs.rule.Check(); err != nil {
+		return err
+	}
+
+	// then make sure ruleFs supports it already
+
+	if len(fs.rule.targets) > 1 {
+		return errInvalidRule("multiple targets not supported yet")
+	}
+
+	if len(fs.rule.sources) > 1 {
+		return errInvalidRule("multiple sources not supported yet")
+	}
+
+	if !isPattern(fs.rule.targets[0]) {
+		return errInvalidRule("non-pattern targets not supported yet")
+	}
+
+	if !isPattern(fs.rule.sources[0]) {
+		return errInvalidRule("non-pattern sources not supported yet")
+	}
+
+	return nil
 }
 
 func isPattern(str string) bool {
@@ -321,4 +364,11 @@ type rule struct {
 	targets []string
 	sources []string
 	recipe  Recipe
+}
+
+func (r *rule) Check() error {
+	if len(r.targets) < 1 {
+		return errInvalidRule("does not contain any targets")
+	}
+	return nil
 }
