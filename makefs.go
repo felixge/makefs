@@ -71,16 +71,21 @@ type ruleFs struct {
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
 	task, err := fs.task(path)
+
+	// something went wrong, (invalid rule, source could not be opened, etc.).
 	if err != nil {
 		return nil, err
 	}
-	
+
+	// no task could be synthesized for the given path. In this case we'll return
+	// whatever the parent fs has to offer, but we'll proxy all Readdir calls on
+	// the file back to our ruleFs (as we need to apply our rule to them).
 	if task == nil {
 		file, err := fs.parent.Open(path)
 		if file == nil {
 			return nil, err
 		}
-		return &proxyFile{File: file, ruleFs: fs, path: path}, err
+		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
 	}
 
 	return newTargetFile(task, path), nil
@@ -137,7 +142,7 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	return task, nil
 }
 
-func (fs *ruleFs) readdir(file *proxyFile, count int) ([]os.FileInfo, error) {
+func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
 	if len(fs.rule.targets) > 1 {
 		return nil, fmt.Errorf("not done yet: multiple targets")
 	}
@@ -225,13 +230,13 @@ func isGlob(str string) bool {
 	return strings.Contains(str, "*")
 }
 
-type proxyFile struct {
+type readdirProxy struct {
 	http.File
 	path   string
 	ruleFs *ruleFs
 }
 
-func (file *proxyFile) Readdir(count int) ([]os.FileInfo, error) {
+func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 	return file.ruleFs.readdir(file, count)
 }
 
