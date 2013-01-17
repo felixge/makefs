@@ -20,7 +20,7 @@ var (
 
 func TestMakeFs_Make(t *testing.T) {
 	fs := NewFs(http.Dir(fixturesDir))
-	fs.Make("%.sha1", "%.txt", func(t *task) error {
+	fs.Make("%.sha1", "%.txt", func(t *Task) error {
 		hash := sha1.New()
 		if _, err := io.Copy(hash, t.Source()); err != nil {
 			return err
@@ -171,7 +171,7 @@ func strongRuleFs() http.FileSystem {
 		rule: &rule{
 			targets: []string{"%.strong"},
 			sources: []string{"%.txt"},
-			recipe: func(task *task) error {
+			recipe: func(task *Task) error {
 				target := task.Target()
 				source := task.Source()
 

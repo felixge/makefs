@@ -54,7 +54,7 @@ func (fs *Fs) Make(target string, source string, recipe Recipe) {
 }
 
 func (fs *Fs) ExecMake(target string, source string, command string, args ...string) {
-	fs.Make(target, source, func(task *task) error {
+	fs.Make(target, source, func(task *Task) error {
 		cmd := exec.Command(command, args...)
 		cmd.Stdin = task.Source()
 		cmd.Stdout = task.Target()
@@ -69,10 +69,25 @@ type ruleFs struct {
 	rule   *rule
 }
 
-//var errUndefined := fmt.Errorf("")
-
 func (fs *ruleFs) Open(path string) (http.File, error) {
-	task := &task{}
+	task, err := fs.task(path)
+	if err != nil {
+		return nil, err
+	}
+	
+	if task == nil {
+		file, err := fs.parent.Open(path)
+		if file == nil {
+			return nil, err
+		}
+		return &proxyFile{File: file, ruleFs: fs, path: path}, err
+	}
+
+	return newTargetFile(task, path), nil
+}
+
+func (fs *ruleFs) task(path string) (*Task, error) {
+	task := &Task{}
 
 	if len(fs.rule.targets) > 1 {
 		return nil, fmt.Errorf("not done yet: multiple targets")
@@ -114,11 +129,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 	}
 
 	if task.target == nil {
-		file, err := fs.parent.Open(path)
-		if file == nil {
-			return file, err
-		}
-		return &proxyFile{File: file, ruleFs: fs, path: path}, err
+		return nil, nil
 	}
 
 	task.runFunc = func() {
@@ -127,7 +138,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		task.source.Close()
 	}
 
-	return newTargetFile(task, path), nil
+	return task, nil
 }
 
 func (fs *ruleFs) readdir(file *proxyFile, count int) ([]os.FileInfo, error) {
@@ -228,7 +239,7 @@ func (file *proxyFile) Readdir(count int) ([]os.FileInfo, error) {
 	return file.ruleFs.readdir(file, count)
 }
 
-func newTargetFile(task *task, path string) *targetFile {
+func newTargetFile(task *Task, path string) *targetFile {
 	return &targetFile{
 		task: task,
 		path: path,
@@ -236,7 +247,7 @@ func newTargetFile(task *task, path string) *targetFile {
 }
 
 type targetFile struct {
-	task   *task
+	task   *Task
 	path   string
 	reader io.Reader
 }
@@ -315,28 +326,28 @@ func (s *targetStat) Sys() interface{} {
 	return nil
 }
 
-type task struct {
+type Task struct {
 	runFunc func()
 	runOnce sync.Once
 	target  *broadcast
 	source  http.File
 }
 
-func (t *task) Target() io.Writer {
+func (t *Task) Target() io.Writer {
 	return t.target
 }
 
-func (t *task) Source() io.Reader {
+func (t *Task) Source() io.Reader {
 	return t.source
 }
 
 // start executes the recipe unless it has already started executing, in which
 // case the call is ignored.
-func (t *task) start() {
+func (t *Task) start() {
 	go t.runOnce.Do(t.runFunc)
 }
 
-type Recipe func(*task) error
+type Recipe func(*Task) error
 
 type rule struct {
 	targets []string
