@@ -54,17 +54,27 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 
 func (fs *ruleFs) task(path string) (*Task, error) {
 	target := fs.rule.targets[0]
-	stem := findStem(path, target)
-
-	// target pattern did not match, no task can be synthesized
-	if stem == "" {
+	if !isPattern(target) && target != path {
 		return nil, nil
 	}
 
 	task := &Task{target: newBroadcast()}
 
 	source := fs.rule.sources[0]
-	sourcePath := insertStem(source, stem)
+	var sourcePath string
+	if isPattern(source) {
+		stem := findStem(path, target)
+
+		// target pattern did not match, no task can be synthesized
+		if stem == "" {
+			return nil, nil
+		}
+
+		sourcePath = insertStem(source, stem)
+	} else {
+		sourcePath = source
+	}
+
 	sourceFile, err := fs.parent.Open(sourcePath)
 	if os.IsNotExist(err) {
 		return nil, fmt.Errorf("not done yet: pattern source not found")
@@ -85,9 +95,8 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 
 func (fs *ruleFs) isSource(path string) bool {
 	for _, source := range fs.rule.sources {
-		// non-pattern sources not done yet
-		if !isPattern(source) {
-			return false
+		if !isPattern(source) && source == path {
+			return true
 		}
 
 		stem := findStem(path, source)
@@ -110,39 +119,38 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 
 	results := []os.FileInfo{}
 	for _, stat := range stats {
-		for _, source := range fs.rule.sources {
-			if !isPattern(source) {
-				return nil, fmt.Errorf("not done yet: non-pattern sources")
-			}
+		source := fs.rule.sources[0]
 
-			stem := findStem(filepath.Join(file.path, stat.Name()), source)
-
-			// source pattern did not match, break inner loop
-			if stem == "" {
-				results = append(results, stat)
-				break
-			}
-
-			for _, target := range fs.rule.targets {
-				if !isPattern(target) {
-					return nil, fmt.Errorf("not done yet: non-pattern targets")
-				}
-
-				targetPath := insertStem(target, stem)
-				targetFile, err := fs.Open(targetPath)
-				if err != nil {
-					return nil, err
-				}
-				defer targetFile.Close()
-
-				targetStat, err := targetFile.Stat()
-				if err != nil {
-					return nil, err
-				}
-
-				results = append(results, targetStat)
-			}
+		if !isPattern(source) {
+			return nil, fmt.Errorf("not done yet: non-pattern sources")
 		}
+
+		stem := findStem(filepath.Join(file.path, stat.Name()), source)
+
+		// source pattern did not match, break inner loop
+		if stem == "" {
+			results = append(results, stat)
+			break
+		}
+
+		target := fs.rule.targets[0]
+		if !isPattern(target) {
+			return nil, fmt.Errorf("not done yet: non-pattern targets")
+		}
+
+		targetPath := insertStem(target, stem)
+		targetFile, err := fs.Open(targetPath)
+		if err != nil {
+			return nil, err
+		}
+		defer targetFile.Close()
+
+		targetStat, err := targetFile.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, targetStat)
 	}
 
 	return results, nil
@@ -167,12 +175,8 @@ func (fs *ruleFs) checkRule() error  {
 		return errInvalidRule("multiple sources not supported yet")
 	}
 
-	if !isPattern(fs.rule.targets[0]) {
-		return errInvalidRule("non-pattern targets not supported yet")
-	}
-
-	if !isPattern(fs.rule.sources[0]) {
-		return errInvalidRule("non-pattern sources not supported yet")
+	if !isPattern(fs.rule.targets[0]) && isPattern(fs.rule.sources[0]) {
+		return errInvalidRule("non-pattern targets not supported for pattern sources yet")
 	}
 
 	return nil
