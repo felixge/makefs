@@ -115,6 +115,7 @@ func TestRuleFs_Readdir(t *testing.T) {
 
 	expected := map[string]int64{
 		"foo.strong": 42,
+		"sub":        -1,
 	}
 
 	for _, stat := range stats {
@@ -127,6 +128,8 @@ func TestRuleFs_Readdir(t *testing.T) {
 		if expectedSize, ok := expected[name]; !ok {
 			t.Errorf("unexpected file: %s", name)
 			continue
+		} else if expectedSize == -1 {
+			// -1 means don't check the size on this file (used for dirs)
 		} else if expectedSize != size {
 			t.Errorf("got size: %d, expected: %d for: %s", size, expectedSize, name)
 		}
