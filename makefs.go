@@ -72,7 +72,7 @@ type ruleFs struct {
 func (fs *ruleFs) Open(path string) (http.File, error) {
 	task, err := fs.task(path)
 
-	// something went wrong, (invalid rule, source could not be opened, etc.).
+	// something went wrong (invalid rule, source could not be opened, etc.).
 	if err != nil {
 		return nil, err
 	}
