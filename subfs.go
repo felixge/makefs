@@ -7,18 +7,18 @@ import (
 	"strings"
 )
 
-func NewSubFs(base http.FileSystem, path string) http.FileSystem {
-	return &SubFs{base: base, path: path}
+func NewSubFs(base http.FileSystem, newRoot string) http.FileSystem {
+	return &SubFs{base: base, root: newRoot}
 }
 
 type SubFs struct {
 	base http.FileSystem
-	path string
+	root string
 }
 
 func (fs *SubFs) Open(path string) (http.File, error) {
-	subPath := gopath.Join(fs.path, path)
-	if !strings.HasPrefix(subPath, fs.path) {
+	subPath := gopath.Join(fs.root, path)
+	if !strings.HasPrefix(subPath, fs.root) {
 		return nil, os.ErrPermission
 	}
 	return fs.base.Open(subPath)
