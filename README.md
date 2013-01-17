@@ -17,10 +17,10 @@ For production, makefs provides functions for writing the resulting file system
 to disk (which is useful for static site generators), or into a `.go` file,
 which you can statically link into your application for deployment.
 
-## Introduction
+## Example
 
 @TODO
 
 ## License
 
-@TODO
+MIT license, see LICENSE.txt file.
