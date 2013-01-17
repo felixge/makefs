@@ -18,6 +18,10 @@ type ruleFs struct {
 }
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
+	if fs.isSource(path) {
+		return nil, os.ErrNotExist
+	}
+
 	task, err := fs.task(path)
 
 	// something went wrong (invalid rule, source could not be opened, etc.).
@@ -88,6 +92,21 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	}
 
 	return task, nil
+}
+
+func (fs *ruleFs) isSource(path string) bool {
+	for _, source := range fs.rule.sources {
+		// non-pattern sources not done yet
+		if !isPattern(source) {
+			return false
+		}
+
+		stem := findStem(path, source)
+		if stem != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
