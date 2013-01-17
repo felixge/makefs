@@ -64,6 +64,10 @@ func (fs *Fs) ExecMake(target string, source string, command string, args ...str
 	})
 }
 
+func (fs *Fs) SubFs(newRoot string) (http.FileSystem) {
+	return NewSubFs(fs.head, newRoot)
+}
+
 type ruleFs struct {
 	parent http.FileSystem
 	rule   *rule

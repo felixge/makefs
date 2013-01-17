@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -69,6 +70,18 @@ func TestMakeFs_ExecMake(t *testing.T) {
 	}
 }
 
+func TestMakeFs_SubFs(t *testing.T) {
+	fs := NewFs(http.Dir(fixturesDir))
+	subFs := fs.SubFs("/sub")
+
+	if _, err := fs.Open("/a.txt"); !os.IsNotExist(err) {
+		t.Fatal("unexpected error", err)
+	}
+
+	if _, err := subFs.Open("/a.txt"); err != nil {
+		t.Fatal("unexpected error", err)
+	}
+}
 
 func TestRuleFs_Read(t *testing.T) {
 	fs := strongRuleFs()
