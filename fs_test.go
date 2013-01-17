@@ -7,16 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
-)
-
-// Get name/dir of this source file
-var (
-	_, __filename, _, _ = runtime.Caller(0)
-	__dirname           = filepath.Dir(__filename)
-	fixturesDir         = __dirname + "/fixtures"
 )
 
 func TestMakeFs_Make(t *testing.T) {
