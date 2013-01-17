@@ -104,9 +104,9 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 
 		stem := findStem(path, target)
 
-		// target pattern did not match, rule does not apply
+		// target pattern did not match, no task can be synthesized
 		if stem == "" {
-			break
+			return nil, nil
 		}
 
 		task.target = newBroadcast()
@@ -126,10 +126,6 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 
 			task.source = sourceFile
 		}
-	}
-
-	if task.target == nil {
-		return nil, nil
 	}
 
 	task.runFunc = func() {
