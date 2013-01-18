@@ -118,27 +118,26 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 	}
 
 	results := []os.FileInfo{}
+	source := fs.rule.sources[0]
+	target := fs.rule.targets[0]
+
 	for _, stat := range stats {
-		source := fs.rule.sources[0]
 
-		if !isPattern(source) {
-			return nil, fmt.Errorf("not done yet: non-pattern sources")
+		var targetPath string
+		if isPattern(source) {
+			stem := findStem(filepath.Join(file.path, stat.Name()), source)
+
+			// source pattern did not match, break inner loop
+			if stem == "" {
+				results = append(results, stat)
+				break
+			}
+
+			targetPath = insertStem(target, stem)
+		} else {
+			targetPath = target
 		}
 
-		stem := findStem(filepath.Join(file.path, stat.Name()), source)
-
-		// source pattern did not match, break inner loop
-		if stem == "" {
-			results = append(results, stat)
-			break
-		}
-
-		target := fs.rule.targets[0]
-		if !isPattern(target) {
-			return nil, fmt.Errorf("not done yet: non-pattern targets")
-		}
-
-		targetPath := insertStem(target, stem)
 		targetFile, err := fs.Open(targetPath)
 		if err != nil {
 			return nil, err
