@@ -28,17 +28,20 @@ func (fs *Fs) Open(path string) (http.File, error) {
 	return fs.head.Open(path)
 }
 
-func (fs *Fs) MultiMake(targets []string, sources []string, recipe Recipe) {
+func (fs *Fs) MultiMake(targets []string, sources []string, recipe Recipe) error {
 	rule := &rule{
 		targets: targets,
 		sources: sources,
 		recipe:  recipe,
 	}
 
-	fs.head = &ruleFs{
-		parent: fs.head,
-		rule:   rule,
+	ruleFs, err := newRuleFs(fs.head, rule)
+	if err != nil {
+		return err
 	}
+
+	fs.head = ruleFs
+	return nil
 }
 
 func (fs *Fs) Make(target string, source string, recipe Recipe) {

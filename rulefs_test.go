@@ -122,7 +122,7 @@ func (check *ExistCheck) Check(fs http.FileSystem) error {
 	_, err := fs.Open(check.path)
 
 	existErr := os.IsNotExist(err)
-	if (check.shouldExist ) {
+	if check.shouldExist {
 		if existErr {
 			return fmt.Errorf("should exist, but does not")
 		} else if err != nil {
@@ -199,6 +199,7 @@ var FindStemTests = []struct {
 	{Str: "/pages", Pattern: "/public/%.html", Expect: ""},
 	{Str: "foo.txt", Pattern: ".txt", Expect: ""},
 	{Str: "/", Pattern: "%.txt", Expect: ""},
+	{Str: "/bar/foo.txt", Pattern: "bar/%.txt", Expect: "foo"},
 }
 
 func Test_findStem(t *testing.T) {
@@ -209,3 +210,31 @@ func Test_findStem(t *testing.T) {
 		}
 	}
 }
+
+//var RuleIsSourceTests = []struct {
+	//Path    string
+	//Sources []string
+	//Expect  bool
+//}{
+	//{Path: "/foo.txt", Sources: []string{"/foo.txt"}, Expect: true},
+	//{Path: "/bar.txt", Sources: []string{"/foo.txt"}, Expect: false},
+	//{Path: "/bar/foo.txt", Sources: []string{"/foo.txt"}, Expect: false},
+	//{Path: "/foo.txt", Sources: []string{"foo.txt"}, Expect: true},
+	//{Path: "/bar/foo.txt", Sources: []string{"foo.txt"}, Expect: true},
+	//{Path: "/bar/foo.txt", Sources: []string{"bar/foo.txt"}, Expect: true},
+	//{Path: "/foo.txt", Sources: []string{"%.txt"}, Expect: true},
+	//{Path: "/bar/foo.txt", Sources: []string{"%.txt"}, Expect: true},
+	//{Path: "/foo.bar", Sources: []string{"%.txt"}, Expect: false},
+	//{Path: "/foo.txt", Sources: []string{"bar/%.txt"}, Expect: false},
+	//{Path: "/bar/foo.txt", Sources: []string{"bar/%.txt"}, Expect: true},
+//}
+
+//func TestRule_IsSource(t *testing.T) {
+	//for _, test := range RuleIsSourceTests {
+		//rule := &rule{sources: test.Sources}
+		//got := rule.IsSource(test.Path)
+		//if got != test.Expect {
+			//t.Errorf("expected: %t, but got: %t for: %#v", test.Expect, got, test)
+		//}
+	//}
+//}

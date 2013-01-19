@@ -1,20 +1,33 @@
 package makefs
 
 import (
-	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
+	gopath "path"
 	"strings"
 	"sync"
-	"time"
 )
+
+func newRuleFs(parent http.FileSystem, rule *rule) (*ruleFs, error) {
+	if err := rule.Check(); err != nil {
+		return nil, err
+	}
+
+	ruleFs := &ruleFs{
+		parent: parent,
+		rule:   rule,
+		cache:  make(map[string]*Task),
+	}
+
+	return ruleFs, nil
+}
 
 type ruleFs struct {
 	parent http.FileSystem
 	rule   *rule
+	cacheLock      sync.Mutex
+	cache  map[string]*Task
 }
 
 type errInvalidRule string
@@ -24,23 +37,14 @@ func (err errInvalidRule) Error() string {
 }
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
-	// refuse work if our rule is supported
-	if err := fs.checkRule(); err != nil {
-		return nil, err
-	}
-
-	if fs.isSource(path) {
-		return nil, os.ErrNotExist
-	}
-
+	// Try to synthesize a task for the give path
 	task, err := fs.task(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// No task means that the given path is not a target. However, it could be a
-	// directory, so we need to wrap any files returned by the parent fs,
-	// allowing us to proxy any Readdir calls back to this rulefs.
+	// No task means we just forward this request to the parent fs. However, we
+	// return a readdirProxy to hijack any Readdir() calls on the returned file.
 	if task == nil {
 		file, err := fs.parent.Open(path)
 		if file == nil {
@@ -49,136 +53,92 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
 	}
 
-	return newTargetFile(task, path), nil
+	// Task can have multiple targets, return the right one
+	for _, target := range task.targets {
+		if target.path == path {
+			return target.httpFile(), nil
+		}
+	}
+	panic("unreachable")
 }
 
 func (fs *ruleFs) task(path string) (*Task, error) {
-	target := fs.rule.targets[0]
-	if !isPattern(target) && target != path {
+	// Aquire lock to synchronize task creation / cache access
+	fs.cacheLock.Lock()
+	defer fs.cacheLock.Unlock()
+
+	// Find all targets
+	targets := fs.rule.targetsForTargetPath(path)
+	if targets == nil {
 		return nil, nil
 	}
 
-	task := &Task{target: newBroadcast()}
-
-	source := fs.rule.sources[0]
-	var sourcePath string
-	if isPattern(source) {
-		stem := findStem(path, target)
-
-		// target pattern did not match, no task can be synthesized
-		if stem == "" {
-			return nil, nil
-		}
-
-		sourcePath = insertStem(source, stem)
-	} else {
-		sourcePath = source
-	}
-
-	sourceFile, err := fs.parent.Open(sourcePath)
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("not done yet: pattern source not found")
-	} else if err != nil {
+	// Find all sources
+	sources, err := fs.rule.sourcesForTargets(targets, fs.parent)
+	if err != nil {
 		return nil, err
+	} else if sources == nil {
+		// Note: This is different from len(sources) == 0, which is a valid task
+		// that does not depend on any sources (.PHONY in make).
+		return nil, nil
 	}
 
-	task.source = sourceFile
+	// Synthesize task
+	task := newTask(targets, sources)
 
-	task.runFunc = func() {
-		err := fs.rule.recipe(task)
-		task.target.CloseWithError(err)
-		task.source.Close()
+	// Check if we already synthesized this task before and can reuse it.
+	id := task.id()
+	if cachedTask, ok := fs.cache[id]; ok {
+		if cachedTask.current(task) {
+			task = cachedTask
+		}
 	}
+
+	// Update cache
+	fs.cache[id] = task
 
 	return task, nil
 }
 
-func (fs *ruleFs) isSource(path string) bool {
-	for _, source := range fs.rule.sources {
-		if !isPattern(source) && source == path {
-			return true
-		}
-
-		stem := findStem(path, source)
-		if stem != "" {
-			return true
-		}
-	}
-	return false
-}
-
 func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
-	if err := fs.checkRule(); err != nil {
-		return nil, err
-	}
-
-	stats, err := file.File.Readdir(count)
+	parentStats, err := file.File.Readdir(count)
 	if err != nil {
 		return nil, err
 	}
 
-	results := []os.FileInfo{}
-	source := fs.rule.sources[0]
-	target := fs.rule.targets[0]
+	var results []os.FileInfo
+	var knownTargets map[string]bool
 
-	for _, stat := range stats {
+	for _, parentStat := range parentStats {
+		parentPath := gopath.Join(file.path, parentStat.Name())
+		targets := fs.rule.targetsForSourcePath(parentPath)
+		if targets == nil {
+			results = append(results, parentStat)
+			continue
+		}
 
-		var targetPath string
-		if isPattern(source) {
-			stem := findStem(filepath.Join(file.path, stat.Name()), source)
-
-			// source pattern did not match, break inner loop
-			if stem == "" {
-				results = append(results, stat)
-				break
+		for _, target := range targets {
+			if knownTargets[target.path] {
+				continue
 			}
 
-			targetPath = insertStem(target, stem)
-		} else {
-			targetPath = target
-		}
+			targetFile, err := fs.Open(target.path)
+			if err != nil {
+				return nil, err
+			}
+			defer targetFile.Close()
 
-		targetFile, err := fs.Open(targetPath)
-		if err != nil {
-			return nil, err
-		}
-		defer targetFile.Close()
+			targetStat, err := targetFile.Stat()
+			if err != nil {
+				return nil, err
+			}
 
-		targetStat, err := targetFile.Stat()
-		if err != nil {
-			return nil, err
+			results = append(results, targetStat)
+			knownTargets[target.path] = true
 		}
-
-		results = append(results, targetStat)
 	}
 
 	return results, nil
-}
-
-// checkRule determines if the given rule can be executed by ruleFs. It will
-// return an error if the rule is invalid, or support for it has not been
-// implemented yet.
-func (fs *ruleFs) checkRule() error  {
-	// check if the rule itself is valid
-	if err := fs.rule.Check(); err != nil {
-		return err
-	}
-
-	// then make sure ruleFs supports it already
-
-	if len(fs.rule.targets) > 1 {
-		return errInvalidRule("multiple targets not supported yet")
-	}
-
-	if len(fs.rule.sources) > 1 {
-		return errInvalidRule("multiple sources not supported yet")
-	}
-
-	if !isPattern(fs.rule.targets[0]) && isPattern(fs.rule.sources[0]) {
-		return errInvalidRule("non-pattern targets not supported for pattern sources yet")
-	}
-
-	return nil
 }
 
 func isPattern(str string) bool {
@@ -225,112 +185,139 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 	return file.ruleFs.readdir(file, count)
 }
 
-func newTargetFile(task *Task, path string) *targetFile {
-	return &targetFile{
-		task: task,
-		path: path,
-	}
+//func newTargetFile(task *Task, path string) *targetFile {
+	//return &targetFile{
+		//task: task,
+		//path: path,
+	//}
+//}
+
+//type targetFile struct {
+	//task   *Task
+	//path   string
+	//reader io.Reader
+//}
+
+//func (file *targetFile) Close() error {
+	//// @TODO make future read calls fail
+	//return nil
+//}
+
+//func (file *targetFile) Read(buf []byte) (int, error) {
+	//if file.reader == nil {
+		//file.reader = file.client()
+	//}
+	//return file.reader.Read(buf)
+//}
+
+//func (file *targetFile) Seek(offset int64, whence int) (int64, error) {
+	//return 0, fmt.Errorf("not done yet: Seek()")
+//}
+
+//func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
+	//// @TODO is there something more idomatic we can return here that makes sense
+	//// cross-plattform?
+	//return nil, fmt.Errorf("readdir: target file is not a dir")
+//}
+
+//func (file *targetFile) Stat() (os.FileInfo, error) {
+	//stat := &targetStat{targetFile: file}
+	//return stat, nil
+//}
+
+//func (file *targetFile) client() io.Reader {
+	//// make sure our recipe is executed
+	//file.task.start()
+	//return file.task.target.Client()
+//}
+
+//type targetStat struct {
+	//targetFile *targetFile
+//}
+
+//func (s *targetStat) IsDir() bool {
+	//// @TODO support targets that are directories
+	//return false
+//}
+
+//func (s *targetStat) ModTime() time.Time {
+	//// @TODO finish
+	//return time.Now()
+//}
+
+//func (s *targetStat) Mode() os.FileMode {
+	//// @TODO Finish
+	//return 0
+//}
+
+//func (s *targetStat) Name() string {
+	//return gopath.Base(s.targetFile.path)
+//}
+
+//// Size determines the size of the target file by creating a new broadcast
+//// client, and counting the bytes until EOF. It returns -1 if the broadcast
+//// client returns an error other than EOF from read.
+////
+//// This means that calling this methods requires executing the recipe.
+//func (s *targetStat) Size() int64 {
+	//client := s.targetFile.client()
+	//n, err := io.Copy(ioutil.Discard, client)
+	//if err != nil {
+		//return -1
+	//}
+	//return n
+//}
+
+//func (s *targetStat) Sys() interface{} {
+	//return nil
+//}
+
+type Target struct {
+	path string
 }
 
-type targetFile struct {
-	task   *Task
-	path   string
-	reader io.Reader
-}
-
-func (file *targetFile) Close() error {
-	// @TODO make future read calls fail
+func (t *Target) httpFile() http.File {
 	return nil
 }
 
-func (file *targetFile) Read(buf []byte) (int, error) {
-	if file.reader == nil {
-		file.reader = file.client()
-	}
-	return file.reader.Read(buf)
-}
+type Source struct{}
 
-func (file *targetFile) Seek(offset int64, whence int) (int64, error) {
-	return 0, fmt.Errorf("not done yet: Seek()")
-}
-
-func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
-	// @TODO is there something more idomatic we can return here that makes sense
-	// cross-plattform?
-	return nil, fmt.Errorf("readdir: target file is not a dir")
-}
-
-func (file *targetFile) Stat() (os.FileInfo, error) {
-	stat := &targetStat{targetFile: file}
-	return stat, nil
-}
-
-func (file *targetFile) client() io.Reader {
-	// make sure our recipe is executed
-	file.task.start()
-	return file.task.target.Client()
-}
-
-type targetStat struct {
-	targetFile *targetFile
-}
-
-func (s *targetStat) IsDir() bool {
-	// @TODO support targets that are directories
-	return false
-}
-
-func (s *targetStat) ModTime() time.Time {
-	// @TODO finish
-	return time.Now()
-}
-
-func (s *targetStat) Mode() os.FileMode {
-	// @TODO Finish
-	return 0
-}
-
-func (s *targetStat) Name() string {
-	return filepath.Base(s.targetFile.path)
-}
-
-// Size determines the size of the target file by creating a new broadcast
-// client, and counting the bytes until EOF. It returns -1 if the broadcast
-// client returns an error other than EOF from read.
-//
-// This means that calling this methods requires executing the recipe.
-func (s *targetStat) Size() int64 {
-	client := s.targetFile.client()
-	n, err := io.Copy(ioutil.Discard, client)
-	if err != nil {
-		return -1
-	}
-	return n
-}
-
-func (s *targetStat) Sys() interface{} {
+func newTask(targets []*Target, sources []*Source) *Task {
 	return nil
 }
 
 type Task struct {
-	runFunc func()
-	runOnce sync.Once
-	target  *broadcast
-	source  http.File
+	targets []*Target
+	//runFunc func()
+	//runOnce sync.Once
+	//target  *broadcast
+	//source  http.File
+}
+
+func (t *Task) id() string {
+	return ""
+}
+
+func (t *Task) current(other *Task) bool {
+	return false
+}
+
+func (t *Task) targetFile(path string) http.File {
+	return nil
 }
 
 func (t *Task) Target() io.Writer {
-	return t.target
+	return nil
 }
 
 func (t *Task) Source() io.Reader {
-	return t.source
+	return nil
 }
 
 // start executes the recipe unless it has already started executing, in which
 // case the call is ignored.
 func (t *Task) start() {
-	go t.runOnce.Do(t.runFunc)
+	//go t.runOnce.Do(t.runFunc)
 }
 
 type Recipe func(*Task) error
@@ -346,4 +333,16 @@ func (r *rule) Check() error {
 		return errInvalidRule("does not contain any targets")
 	}
 	return nil
+}
+
+func (r *rule) targetsForTargetPath(path string) []*Target  {
+	return nil
+}
+
+func (r *rule) targetsForSourcePath(path string) []*Target  {
+	return nil
+}
+
+func (r *rule) sourcesForTargets(targets []*Target, fs http.FileSystem) ([]*Source, error)  {
+	return nil, nil
 }
