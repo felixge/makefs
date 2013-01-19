@@ -288,10 +288,6 @@ func newTask(targets []*Target, sources []*Source) *Task {
 
 type Task struct {
 	targets []*Target
-	//runFunc func()
-	//runOnce sync.Once
-	//target  *broadcast
-	//source  http.File
 }
 
 func (t *Task) id() string {
@@ -314,11 +310,6 @@ func (t *Task) Source() io.Reader {
 	return nil
 }
 
-// start executes the recipe unless it has already started executing, in which
-// case the call is ignored.
-func (t *Task) start() {
-	//go t.runOnce.Do(t.runFunc)
-}
 
 type Recipe func(*Task) error
 
