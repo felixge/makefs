@@ -164,7 +164,8 @@ func isPattern(str string) bool {
 }
 
 // findStem returns the value the % wildcard in pattern fills in the given str,
-// or "" if the pattern does not match.
+// or "" if the pattern does not match. The end of pattern has to match exactly.
+// The has to occur inside the str before the % offset.
 func findStem(str string, pattern string) string {
 	stemOffset := strings.Index(pattern, "%")
 	if stemOffset < 0 {
@@ -174,11 +175,17 @@ func findStem(str string, pattern string) string {
 	prefix := pattern[0:stemOffset]
 	suffix := pattern[stemOffset+1:]
 
-	if !strings.HasPrefix(str, prefix) {
+	offset := strings.Index(str, prefix)
+	if offset < 0 {
+		return ""
+	}
+	prefix = str[0:offset+len(prefix)]
+
+	if !strings.HasSuffix(str, suffix) {
 		return ""
 	}
 
-	if !strings.HasSuffix(str, suffix) {
+	if len(prefix) + len(suffix) == len(str) {
 		return ""
 	}
 
@@ -290,16 +297,6 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 //return nil
 //}
 
-type Target struct {
-	path string
-}
-
-func (t *Target) httpFile() http.File {
-	return nil
-}
-
-type Source struct{}
-
 func newTask(targets []*Target, sources []*Source) *Task {
 	return nil
 }
@@ -354,3 +351,13 @@ func (r *rule) targetsForSourcePath(path string) []*Target {
 func (r *rule) sourcesForTargets(targets []*Target, fs http.FileSystem) ([]*Source, error) {
 	return nil, nil
 }
+
+type Target struct {
+	path string
+}
+
+func (t *Target) httpFile() http.File {
+	return nil
+}
+
+type Source struct{}
