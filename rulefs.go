@@ -174,11 +174,11 @@ func findStem(str string, pattern string) string {
 	prefix := pattern[0:stemOffset]
 	suffix := pattern[stemOffset+1:]
 
-	if len(str) < len(prefix) || str[0:len(prefix)] != prefix {
+	if !strings.HasPrefix(str, prefix) {
 		return ""
 	}
 
-	if len(str) < len(suffix) || str[len(str)-len(suffix):] != suffix {
+	if !strings.HasSuffix(str, suffix) {
 		return ""
 	}
 
