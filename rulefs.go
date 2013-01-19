@@ -24,10 +24,10 @@ func newRuleFs(parent http.FileSystem, rule *rule) (*ruleFs, error) {
 }
 
 type ruleFs struct {
-	parent http.FileSystem
-	rule   *rule
-	cacheLock      sync.Mutex
-	cache  map[string]*Task
+	parent    http.FileSystem
+	rule      *rule
+	cacheLock sync.Mutex
+	cache     map[string]*Task
 }
 
 type errInvalidRule string
@@ -101,7 +101,8 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 }
 
 func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
-	parentStats, err := file.File.Readdir(count)
+	// Get stats from parent file system
+	stats, err := file.File.Readdir(count)
 	if err != nil {
 		return nil, err
 	}
@@ -109,34 +110,51 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 	var results []os.FileInfo
 	var knownTargets map[string]bool
 
-	for _, parentStat := range parentStats {
-		parentPath := gopath.Join(file.path, parentStat.Name())
-		targets := fs.rule.targetsForSourcePath(parentPath)
+	for _, stat := range stats {
+		// Resolve full path
+		path := gopath.Join(file.path, stat.Name())
+
+		// This path could be the source of one or more target files
+		targets := fs.rule.targetsForSourcePath(path)
 		if targets == nil {
-			results = append(results, parentStat)
+			// If not, assume this file can be listed without tweaking
+			//
+			// BUG: This file could also be a target during this loop, so we need to
+			// filter the results list for duplicates before returning.
+			results = append(results, stat)
 			continue
 		}
 
+		// Itertate over the targets of this file
 		for _, target := range targets {
+			// If we already added this target to the results, skip it
 			if knownTargets[target.path] {
 				continue
 			}
 
+			// Open the target http file
 			targetFile, err := fs.Open(target.path)
 			if err != nil {
 				return nil, err
 			}
 			defer targetFile.Close()
 
+			// Get the stat info (this does not trigger the recipe unless Size()
+			// is invoked).
 			targetStat, err := targetFile.Stat()
 			if err != nil {
 				return nil, err
 			}
 
+			// Append the stat to the results and remember that we did that
 			results = append(results, targetStat)
 			knownTargets[target.path] = true
 		}
+
+		// @TODO Once KeepSources is implemented, keep the original stat
 	}
+
+	// @TODO Filter results for dupes somehow, see BUG above
 
 	return results, nil
 }
@@ -186,72 +204,72 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 }
 
 //func newTargetFile(task *Task, path string) *targetFile {
-	//return &targetFile{
-		//task: task,
-		//path: path,
-	//}
+//return &targetFile{
+//task: task,
+//path: path,
+//}
 //}
 
 //type targetFile struct {
-	//task   *Task
-	//path   string
-	//reader io.Reader
+//task   *Task
+//path   string
+//reader io.Reader
 //}
 
 //func (file *targetFile) Close() error {
-	//// @TODO make future read calls fail
-	//return nil
+//// @TODO make future read calls fail
+//return nil
 //}
 
 //func (file *targetFile) Read(buf []byte) (int, error) {
-	//if file.reader == nil {
-		//file.reader = file.client()
-	//}
-	//return file.reader.Read(buf)
+//if file.reader == nil {
+//file.reader = file.client()
+//}
+//return file.reader.Read(buf)
 //}
 
 //func (file *targetFile) Seek(offset int64, whence int) (int64, error) {
-	//return 0, fmt.Errorf("not done yet: Seek()")
+//return 0, fmt.Errorf("not done yet: Seek()")
 //}
 
 //func (file *targetFile) Readdir(count int) ([]os.FileInfo, error) {
-	//// @TODO is there something more idomatic we can return here that makes sense
-	//// cross-plattform?
-	//return nil, fmt.Errorf("readdir: target file is not a dir")
+//// @TODO is there something more idomatic we can return here that makes sense
+//// cross-plattform?
+//return nil, fmt.Errorf("readdir: target file is not a dir")
 //}
 
 //func (file *targetFile) Stat() (os.FileInfo, error) {
-	//stat := &targetStat{targetFile: file}
-	//return stat, nil
+//stat := &targetStat{targetFile: file}
+//return stat, nil
 //}
 
 //func (file *targetFile) client() io.Reader {
-	//// make sure our recipe is executed
-	//file.task.start()
-	//return file.task.target.Client()
+//// make sure our recipe is executed
+//file.task.start()
+//return file.task.target.Client()
 //}
 
 //type targetStat struct {
-	//targetFile *targetFile
+//targetFile *targetFile
 //}
 
 //func (s *targetStat) IsDir() bool {
-	//// @TODO support targets that are directories
-	//return false
+//// @TODO support targets that are directories
+//return false
 //}
 
 //func (s *targetStat) ModTime() time.Time {
-	//// @TODO finish
-	//return time.Now()
+//// @TODO finish
+//return time.Now()
 //}
 
 //func (s *targetStat) Mode() os.FileMode {
-	//// @TODO Finish
-	//return 0
+//// @TODO Finish
+//return 0
 //}
 
 //func (s *targetStat) Name() string {
-	//return gopath.Base(s.targetFile.path)
+//return gopath.Base(s.targetFile.path)
 //}
 
 //// Size determines the size of the target file by creating a new broadcast
@@ -260,16 +278,16 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 ////
 //// This means that calling this methods requires executing the recipe.
 //func (s *targetStat) Size() int64 {
-	//client := s.targetFile.client()
-	//n, err := io.Copy(ioutil.Discard, client)
-	//if err != nil {
-		//return -1
-	//}
-	//return n
+//client := s.targetFile.client()
+//n, err := io.Copy(ioutil.Discard, client)
+//if err != nil {
+//return -1
+//}
+//return n
 //}
 
 //func (s *targetStat) Sys() interface{} {
-	//return nil
+//return nil
 //}
 
 type Target struct {
@@ -310,7 +328,6 @@ func (t *Task) Source() io.Reader {
 	return nil
 }
 
-
 type Recipe func(*Task) error
 
 type rule struct {
@@ -326,14 +343,14 @@ func (r *rule) Check() error {
 	return nil
 }
 
-func (r *rule) targetsForTargetPath(path string) []*Target  {
+func (r *rule) targetsForTargetPath(path string) []*Target {
 	return nil
 }
 
-func (r *rule) targetsForSourcePath(path string) []*Target  {
+func (r *rule) targetsForSourcePath(path string) []*Target {
 	return nil
 }
 
-func (r *rule) sourcesForTargets(targets []*Target, fs http.FileSystem) ([]*Source, error)  {
+func (r *rule) sourcesForTargets(targets []*Target, fs http.FileSystem) ([]*Source, error) {
 	return nil, nil
 }
