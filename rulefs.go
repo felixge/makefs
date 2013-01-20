@@ -108,12 +108,13 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 		return nil, err
 	}
 
+	fileDir := gopath.Clean(file.path)
+
 	var results []os.FileInfo
 	var knownTargets map[string]bool
-
 	for _, stat := range stats {
 		// Resolve full path
-		path := gopath.Join(file.path, stat.Name())
+		path := gopath.Join(fileDir, stat.Name())
 
 		// This path could be the source of one or more target files
 		targets := fs.rule.targetPathsForSourcePath(path)
@@ -128,8 +129,15 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 
 		// Itertate over the targets of this file
 		for _, target := range targets {
-			// If we already added this target to the results, skip it
+			// If we already found this target, skip it from now on
 			if knownTargets[target.path] {
+				continue
+			}
+			knownTargets[target.path] = true
+
+			// We only care about targets inside the directory being read
+			targetDir := gopath.Dir(target.path)
+			if targetDir != fileDir {
 				continue
 			}
 
@@ -147,9 +155,8 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 				return nil, err
 			}
 
-			// Append the stat to the results and remember that we did that
+			// Append the stat to the results
 			results = append(results, targetStat)
-			knownTargets[target.path] = true
 		}
 
 		// @TODO Once KeepSources is implemented, keep the original stat
