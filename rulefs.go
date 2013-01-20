@@ -170,7 +170,7 @@ func isAbs(str string) bool {
 
 // findStem returns the value the % wildcard in pattern fills in the given str,
 // or "" if the pattern does not match.
-func findStem(str string, pattern string) string {
+func findStem(path string, pattern string) string {
 	pattern = regexp.QuoteMeta(pattern)
 	pattern = strings.Replace(pattern, "%", "(.+?)", 1) + "$"
 
@@ -179,7 +179,7 @@ func findStem(str string, pattern string) string {
 		panic("unreachable")
 	}
 
-	match := matcher.FindStringSubmatch(str)
+	match := matcher.FindStringSubmatch(path)
 	if len(match) != 2 {
 		return ""
 	}
