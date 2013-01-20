@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	gopath "path"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -67,14 +68,14 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	fs.cacheLock.Lock()
 	defer fs.cacheLock.Unlock()
 
-	// Find all targets
-	targets := fs.rule.targetsForTargetPath(path)
-	if targets == nil {
+	// Find all targetPaths
+	targetPaths := fs.rule.targetPathsForTargetPath(path)
+	if targetPaths == nil {
 		return nil, nil
 	}
 
 	// Find all sources
-	sources, err := fs.rule.sourcesForTargets(targets, fs.parent)
+	sources, err := fs.rule.sourcesForTargetPaths(targetPaths, fs.parent)
 	if err != nil {
 		return nil, err
 	} else if sources == nil {
@@ -84,7 +85,7 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	}
 
 	// Synthesize task
-	task := newTask(targets, sources)
+	task := newTask(targetPaths, sources)
 
 	// Check if we already synthesized this task before and can reuse it.
 	id := task.id()
@@ -115,7 +116,7 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 		path := gopath.Join(file.path, stat.Name())
 
 		// This path could be the source of one or more target files
-		targets := fs.rule.targetsForSourcePath(path)
+		targets := fs.rule.targetPathsForSourcePath(path)
 		if targets == nil {
 			// If not, assume this file can be listed without tweaking
 			//
@@ -163,33 +164,27 @@ func isPattern(str string) bool {
 	return strings.Contains(str, "%")
 }
 
+func isAbs(str string) bool {
+	return gopath.IsAbs(str)
+}
+
 // findStem returns the value the % wildcard in pattern fills in the given str,
-// or "" if the pattern does not match. The end of pattern has to match exactly.
-// The has to occur inside the str before the % offset.
+// or "" if the pattern does not match.
 func findStem(str string, pattern string) string {
-	stemOffset := strings.Index(pattern, "%")
-	if stemOffset < 0 {
+	pattern = regexp.QuoteMeta(pattern)
+	pattern = strings.Replace(pattern, "%", "(.+?)", 1) + "$"
+
+	matcher, err := regexp.Compile(pattern)
+	if err != nil {
+		panic("unreachable")
+	}
+
+	match := matcher.FindStringSubmatch(str)
+	if len(match) != 2 {
 		return ""
 	}
 
-	prefix := pattern[0:stemOffset]
-	suffix := pattern[stemOffset+1:]
-
-	offset := strings.Index(str, prefix)
-	if offset < 0 {
-		return ""
-	}
-	prefix = str[0:offset+len(prefix)]
-
-	if !strings.HasSuffix(str, suffix) {
-		return ""
-	}
-
-	if len(prefix) + len(suffix) == len(str) {
-		return ""
-	}
-
-	return str[len(prefix) : len(str)-len(suffix)]
+	return match[1]
 }
 
 func insertStem(pattern string, stem string) string {
@@ -297,7 +292,7 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 //return nil
 //}
 
-func newTask(targets []*Target, sources []*Source) *Task {
+func newTask(targetPaths []string, sources []*Source) *Task {
 	return nil
 }
 
@@ -337,19 +332,75 @@ func (r *rule) Check() error {
 	if len(r.targets) < 1 {
 		return errInvalidRule("does not contain any targets")
 	}
+
+	patternRules := 0
+	absRules := 0
+	for _, target := range r.targets {
+		if isPattern(target) {
+			patternRules++
+		} else if isAbs(target) {
+			absRules++
+		}
+	}
+
+	// example: "/bar", "%.foo" is invalid because it could result in several
+	// tasks targetting the same "/bar" file.
+	if patternRules > 0 && absRules > 0 {
+		return errInvalidRule("cannot mix pattern and abs rules for targets")
+	}
+
 	return nil
 }
 
-func (r *rule) targetsForTargetPath(path string) []*Target {
+func (r *rule) targetPathsForTargetPath(path string) []string {
+	targets := make([]string, 0)
+
+	stem := ""
+	match := false
+
+	// Find out if a rule target matches this path, and if it is a pattern, get
+	// the stem.
+	for _, target := range r.targets {
+		if isAbs(target) {
+			if target == path {
+				match = true
+				break
+			}
+		} else if isPattern(target) {
+			if stem = findStem(path, target); stem != "" {
+				match = true
+				break
+			}
+		}
+	}
+
+	// No target matched, return empty slice
+	if !match {
+		return targets
+	}
+
+	// Get a list of all targets this rule will produce for the given stem
+	for _, target := range r.targets {
+		if isAbs(target) {
+			targets = append(targets, target)
+		} else if isPattern(target) {
+			targets = append(targets, insertStem(target, stem))
+		}
+	}
+
+	return targets
+}
+
+func (r *rule) targetPathsForSourcePath(path string) []*Target {
 	return nil
 }
 
-func (r *rule) targetsForSourcePath(path string) []*Target {
-	return nil
-}
-
-func (r *rule) sourcesForTargets(targets []*Target, fs http.FileSystem) ([]*Source, error) {
+func (r *rule) sourcesForTargetPaths(targets []string, fs http.FileSystem) ([]*Source, error) {
 	return nil, nil
+}
+
+func newTarget(path string) *Target {
+	return &Target{path: path}
 }
 
 type Target struct {

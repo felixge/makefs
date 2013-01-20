@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	gopath "path"
+	"reflect"
 	"testing"
 )
 
@@ -193,13 +194,15 @@ var FindStemTests = []struct {
 	Pattern string
 	Expect  string
 }{
-	{Str: "foo.txt", Pattern: "%.txt", Expect: "foo"},
-	{Str: "foo.txt", Pattern: "foo.%", Expect: "txt"},
-	{Str: "a.b.c", Pattern: "a.%.c", Expect: "b"},
+	{Str: "/foo.txt", Pattern: "%.txt", Expect: "/foo"},
+	{Str: "/foo.txt", Pattern: "/%.txt", Expect: "foo"},
+	{Str: "/bar/foo.txt", Pattern: "/%.txt", Expect: "bar/foo"},
+	{Str: "/foo.txta", Pattern: "%.txt", Expect: ""},
+	{Str: "/foo-bar.txt", Pattern: "%-bar.txt", Expect: "/foo"},
 	{Str: "/pages", Pattern: "/public/%.html", Expect: ""},
-	{Str: "foo.txt", Pattern: ".txt", Expect: ""},
+	{Str: "/foo.txt", Pattern: ".txt", Expect: ""},
 	{Str: "/", Pattern: "%.txt", Expect: ""},
-	{Str: "/bar/foo.txt", Pattern: "bar/%.txt", Expect: "foo"},
+	{Str: "/bar/foo.txt", Pattern: "/bar/%.txt", Expect: "foo"},
 }
 
 func Test_findStem(t *testing.T) {
@@ -207,6 +210,61 @@ func Test_findStem(t *testing.T) {
 		stem := findStem(test.Str, test.Pattern)
 		if stem != test.Expect {
 			t.Errorf("expected stem: %s, got: %s (%+v)", test.Expect, stem, test)
+		}
+	}
+}
+
+var Rule_targetPathsForTargetPathTests = []struct{
+	Description string
+	RuleTargets []string
+	TargetPath string
+	Expected []string
+}{
+	{
+		Description: "1 abs match against 1 abs target",
+		TargetPath: "/foo.txt",
+		RuleTargets: []string{"/foo.txt"},
+		Expected: []string{"/foo.txt"},
+	},
+	{
+		Description: "0 abs matches against 1 abs target",
+		TargetPath: "/bar.txt",
+		RuleTargets: []string{"/foo.txt"},
+		Expected: []string{},
+	},
+	{
+		Description: "1 abs match against 2 abs targets",
+		TargetPath: "/bar.txt",
+		RuleTargets: []string{"/foo.txt", "/bar.txt"},
+		Expected: []string{"/foo.txt", "/bar.txt"},
+	},
+	{
+		Description: "0 abs match against 2 abs targets",
+		TargetPath: "/foobar.txt",
+		RuleTargets: []string{"/foo.txt", "/bar.txt"},
+		Expected: []string{},
+	},
+	{
+		Description: "1 abs match against 1 pattern target",
+		TargetPath: "/foo.txt",
+		RuleTargets: []string{"%.txt"},
+		Expected: []string{"/foo.txt"},
+	},
+	//{
+		//Description: "1 abs match against 2 pattern targets",
+		//TargetPath: "/foo.txt",
+		//RuleTargets: []string{"%.txt", "a-%-b.txt"},
+		//Expected: []string{"/foo.txt", "/a-foo-b.txt"},
+	//},
+}
+
+func TestRule_targetPathsForTargetPathTests(t *testing.T) {
+	for _, test := range Rule_targetPathsForTargetPathTests {
+		t.Logf(test.Description)
+		rule := &rule{targets: test.RuleTargets}
+		targets := rule.targetPathsForTargetPath(test.TargetPath)
+		if !reflect.DeepEqual(targets, test.Expected) {
+			t.Errorf("expected: %#v, got: %#v", test.Expected, targets)
 		}
 	}
 }
