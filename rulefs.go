@@ -330,30 +330,14 @@ func (t *Task) Source() io.Reader {
 type Recipe func(*Task) error
 
 type rule struct {
-	targets []string
+	target  string
 	sources []string
 	recipe  Recipe
 }
 
 func (r *rule) Check() error {
-	if len(r.targets) < 1 {
+	if r.target == "" {
 		return errInvalidRule("does not contain any targets")
-	}
-
-	patternRules := 0
-	absRules := 0
-	for _, target := range r.targets {
-		if isPattern(target) {
-			patternRules++
-		} else if isAbs(target) {
-			absRules++
-		}
-	}
-
-	// example: "/bar", "%.foo" is invalid because it could result in several
-	// tasks targetting the same "/bar" file.
-	if patternRules > 0 && absRules > 0 {
-		return errInvalidRule("cannot mix pattern and abs rules for targets")
 	}
 
 	return nil
@@ -362,38 +346,38 @@ func (r *rule) Check() error {
 func (r *rule) targetPathsForTargetPath(path string) []string {
 	targets := make([]string, 0)
 
-	stem := ""
-	match := false
+	//stem := ""
+	//match := false
 
-	// Find out if a rule target matches this path, and if it is a pattern, get
-	// the stem.
-	for _, target := range r.targets {
-		if isAbs(target) {
-			if target == path {
-				match = true
-				break
-			}
-		} else if isPattern(target) {
-			if stem = findStem(path, target); stem != "" {
-				match = true
-				break
-			}
-		}
-	}
+	//// Find out if a rule target matches this path, and if it is a pattern, get
+	//// the stem.
+	//for _, target := range r.targets {
+		//if isPattern(target) {
+			//if stem = findStem(path, target); stem != "" {
+				//match = true
+				//break
+			//}
+		//} else if isAbs(target) {
+			//if target == path {
+				//match = true
+				//break
+			//}
+		//}
+	//}
 
-	// No target matched, return empty slice
-	if !match {
-		return targets
-	}
+	//// No target matched, return empty slice
+	//if !match {
+		//return targets
+	//}
 
-	// Get a list of all targets this rule will produce for the given stem
-	for _, target := range r.targets {
-		if isAbs(target) {
-			targets = append(targets, target)
-		} else if isPattern(target) {
-			targets = append(targets, insertStem(target, stem))
-		}
-	}
+	//// Get a list of all targets this rule will produce for the given stem
+	//for _, target := range r.targets {
+		//if isPattern(target) {
+			//targets = append(targets, insertStem(target, stem))
+		//} else if isAbs(target) {
+			//targets = append(targets, target)
+		//}
+	//}
 
 	return targets
 }

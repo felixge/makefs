@@ -21,7 +21,7 @@ var RuleFsTests = []struct {
 	{
 		Name: "path to path",
 		Rule: &rule{
-			targets: []string{"/foo.sha1"},
+			target:  "/foo.sha1",
 			sources: []string{"/foo.txt"},
 			recipe:  Sha1Recipe,
 		},
@@ -36,7 +36,7 @@ var RuleFsTests = []struct {
 	{
 		Name: "pattern to pattern",
 		Rule: &rule{
-			targets: []string{"%.sha1"},
+			target:  "%.sha1",
 			sources: []string{"%.txt"},
 			recipe:  Sha1Recipe,
 		},
@@ -214,54 +214,59 @@ func Test_findStem(t *testing.T) {
 	}
 }
 
-var Rule_targetPathsForTargetPathTests = []struct{
+var Rule_targetPathsForTargetPathTests = []struct {
 	Description string
-	RuleTargets []string
-	TargetPath string
-	Expected []string
+	RuleTarget  string
+	TargetPath  string
+	Expected    []string
 }{
-	{
-		Description: "1 abs match against 1 abs target",
-		TargetPath: "/foo.txt",
-		RuleTargets: []string{"/foo.txt"},
-		Expected: []string{"/foo.txt"},
-	},
-	{
-		Description: "0 abs matches against 1 abs target",
-		TargetPath: "/bar.txt",
-		RuleTargets: []string{"/foo.txt"},
-		Expected: []string{},
-	},
-	{
-		Description: "1 abs match against 2 abs targets",
-		TargetPath: "/bar.txt",
-		RuleTargets: []string{"/foo.txt", "/bar.txt"},
-		Expected: []string{"/foo.txt", "/bar.txt"},
-	},
-	{
-		Description: "0 abs match against 2 abs targets",
-		TargetPath: "/foobar.txt",
-		RuleTargets: []string{"/foo.txt", "/bar.txt"},
-		Expected: []string{},
-	},
-	{
-		Description: "1 abs match against 1 pattern target",
-		TargetPath: "/foo.txt",
-		RuleTargets: []string{"%.txt"},
-		Expected: []string{"/foo.txt"},
-	},
-	//{
-		//Description: "1 abs match against 2 pattern targets",
-		//TargetPath: "/foo.txt",
-		//RuleTargets: []string{"%.txt", "a-%-b.txt"},
-		//Expected: []string{"/foo.txt", "/a-foo-b.txt"},
-	//},
+//{
+//Description: "1 abs match against 1 abs target",
+//TargetPath: "/foo.txt",
+//RuleTargets: []string{"/foo.txt"},
+//Expected: []string{"/foo.txt"},
+//},
+//{
+//Description: "0 abs matches against 1 abs target",
+//TargetPath: "/bar.txt",
+//RuleTargets: []string{"/foo.txt"},
+//Expected: []string{},
+//},
+//{
+//Description: "1 abs match against 2 abs targets",
+//TargetPath: "/bar.txt",
+//RuleTargets: []string{"/foo.txt", "/bar.txt"},
+//Expected: []string{"/foo.txt", "/bar.txt"},
+//},
+//{
+//Description: "0 abs match against 2 abs targets",
+//TargetPath: "/foobar.txt",
+//RuleTargets: []string{"/foo.txt", "/bar.txt"},
+//Expected: []string{},
+//},
+//{
+//Description: "1 abs match against 1 pattern target",
+//TargetPath: "/foo.txt",
+//RuleTargets: []string{"%.txt"},
+//Expected: []string{"/foo.txt"},
+//},
+//{
+//Description: "1 abs match against 2 pattern targets",
+//TargetPath: "/foo.txt",
+//RuleTargets: []string{"/%.txt", "a-%-b.txt"},
+//Expected: []string{"/foo.txt", "a-foo-b.txt"},
+//},
 }
 
 func TestRule_targetPathsForTargetPathTests(t *testing.T) {
 	for _, test := range Rule_targetPathsForTargetPathTests {
 		t.Logf(test.Description)
-		rule := &rule{targets: test.RuleTargets}
+		rule := &rule{target: test.RuleTarget}
+		if err := rule.Check(); err != nil {
+			t.Errorf("invalid rule: %#v", rule)
+			continue
+		}
+
 		targets := rule.targetPathsForTargetPath(test.TargetPath)
 		if !reflect.DeepEqual(targets, test.Expected) {
 			t.Errorf("expected: %#v, got: %#v", test.Expected, targets)
@@ -270,29 +275,29 @@ func TestRule_targetPathsForTargetPathTests(t *testing.T) {
 }
 
 //var RuleIsSourceTests = []struct {
-	//Path    string
-	//Sources []string
-	//Expect  bool
+//Path    string
+//Sources []string
+//Expect  bool
 //}{
-	//{Path: "/foo.txt", Sources: []string{"/foo.txt"}, Expect: true},
-	//{Path: "/bar.txt", Sources: []string{"/foo.txt"}, Expect: false},
-	//{Path: "/bar/foo.txt", Sources: []string{"/foo.txt"}, Expect: false},
-	//{Path: "/foo.txt", Sources: []string{"foo.txt"}, Expect: true},
-	//{Path: "/bar/foo.txt", Sources: []string{"foo.txt"}, Expect: true},
-	//{Path: "/bar/foo.txt", Sources: []string{"bar/foo.txt"}, Expect: true},
-	//{Path: "/foo.txt", Sources: []string{"%.txt"}, Expect: true},
-	//{Path: "/bar/foo.txt", Sources: []string{"%.txt"}, Expect: true},
-	//{Path: "/foo.bar", Sources: []string{"%.txt"}, Expect: false},
-	//{Path: "/foo.txt", Sources: []string{"bar/%.txt"}, Expect: false},
-	//{Path: "/bar/foo.txt", Sources: []string{"bar/%.txt"}, Expect: true},
+//{Path: "/foo.txt", Sources: []string{"/foo.txt"}, Expect: true},
+//{Path: "/bar.txt", Sources: []string{"/foo.txt"}, Expect: false},
+//{Path: "/bar/foo.txt", Sources: []string{"/foo.txt"}, Expect: false},
+//{Path: "/foo.txt", Sources: []string{"foo.txt"}, Expect: true},
+//{Path: "/bar/foo.txt", Sources: []string{"foo.txt"}, Expect: true},
+//{Path: "/bar/foo.txt", Sources: []string{"bar/foo.txt"}, Expect: true},
+//{Path: "/foo.txt", Sources: []string{"%.txt"}, Expect: true},
+//{Path: "/bar/foo.txt", Sources: []string{"%.txt"}, Expect: true},
+//{Path: "/foo.bar", Sources: []string{"%.txt"}, Expect: false},
+//{Path: "/foo.txt", Sources: []string{"bar/%.txt"}, Expect: false},
+//{Path: "/bar/foo.txt", Sources: []string{"bar/%.txt"}, Expect: true},
 //}
 
 //func TestRule_IsSource(t *testing.T) {
-	//for _, test := range RuleIsSourceTests {
-		//rule := &rule{sources: test.Sources}
-		//got := rule.IsSource(test.Path)
-		//if got != test.Expect {
-			//t.Errorf("expected: %t, but got: %t for: %#v", test.Expect, got, test)
-		//}
-	//}
+//for _, test := range RuleIsSourceTests {
+//rule := &rule{sources: test.Sources}
+//got := rule.IsSource(test.Path)
+//if got != test.Expect {
+//t.Errorf("expected: %t, but got: %t for: %#v", test.Expect, got, test)
+//}
+//}
 //}

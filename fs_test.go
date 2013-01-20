@@ -12,7 +12,7 @@ import (
 
 func TestMakeFs_Make(t *testing.T) {
 	fs := NewFs(http.Dir(fixturesDir))
-	fs.Make("%.sha1", "%.txt", func(t *Task) error {
+	fs.Make("%.sha1", []string{"%.txt"}, func(t *Task) error {
 		hash := sha1.New()
 		if _, err := io.Copy(hash, t.Source()); err != nil {
 			return err

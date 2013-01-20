@@ -28,9 +28,9 @@ func (fs *Fs) Open(path string) (http.File, error) {
 	return fs.head.Open(path)
 }
 
-func (fs *Fs) MultiMake(targets []string, sources []string, recipe Recipe) error {
+func (fs *Fs) Make(target string, sources []string, recipe Recipe) error {
 	rule := &rule{
-		targets: targets,
+		target:  target,
 		sources: sources,
 		recipe:  recipe,
 	}
@@ -44,12 +44,8 @@ func (fs *Fs) MultiMake(targets []string, sources []string, recipe Recipe) error
 	return nil
 }
 
-func (fs *Fs) Make(target string, source string, recipe Recipe) {
-	fs.MultiMake([]string{target}, []string{source}, recipe)
-}
-
 func (fs *Fs) ExecMake(target string, source string, command string, args ...string) {
-	fs.Make(target, source, func(task *Task) error {
+	fs.Make(target, []string{source}, func(task *Task) error {
 		cmd := exec.Command(command, args...)
 		cmd.Stdin = task.Source()
 		cmd.Stdout = task.Target()
