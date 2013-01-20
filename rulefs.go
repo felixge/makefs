@@ -54,13 +54,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
 	}
 
-	// Task can have multiple targets, return the right one
-	for _, target := range task.targets {
-		if target.path == path {
-			return target.httpFile(), nil
-		}
-	}
-	panic("unreachable")
+	return task.target.httpFile(), nil
 }
 
 func (fs *ruleFs) task(path string) (*Task, error) {
@@ -68,35 +62,28 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	fs.cacheLock.Lock()
 	defer fs.cacheLock.Unlock()
 
-	// Find all targetPaths
-	targetPaths := fs.rule.targetPathsForTargetPath(path)
-	if targetPaths == nil {
-		return nil, nil
-	}
-
 	// Find all sources
-	sources, err := fs.rule.sourcesForTargetPaths(targetPaths, fs.parent)
+	sources, err := fs.rule.findSources(path, fs.parent)
 	if err != nil {
 		return nil, err
-	} else if sources == nil {
 		// Note: This is different from len(sources) == 0, which is a valid task
 		// that does not depend on any sources (.PHONY in make).
+	} else if sources == nil {
 		return nil, nil
 	}
 
 	// Synthesize task
-	task := newTask(targetPaths, sources)
+	task := newTask(path, sources)
 
 	// Check if we already synthesized this task before and can reuse it.
-	id := task.id()
-	if cachedTask, ok := fs.cache[id]; ok {
+	if cachedTask, ok := fs.cache[path]; ok {
 		if cachedTask.current(task) {
 			task = cachedTask
 		}
 	}
 
 	// Update cache
-	fs.cache[id] = task
+	fs.cache[path] = task
 
 	return task, nil
 }
@@ -110,61 +97,49 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 
 	fileDir := gopath.Clean(file.path)
 
-	var results []os.FileInfo
 	var knownTargets map[string]bool
 	for _, stat := range stats {
 		// Resolve full path
 		path := gopath.Join(fileDir, stat.Name())
 
-		// This path could be the source of one or more target files
-		targets := fs.rule.targetPathsForSourcePath(path)
-		if targets == nil {
-			// If not, assume this file can be listed without tweaking
-			//
-			// BUG: This file could also be a target during this loop, so we need to
-			// filter the results list for duplicates before returning.
-			results = append(results, stat)
+		// Returns the target this path is a source of
+		target := fs.rule.findTarget(path)
+		if target == nil {
 			continue
 		}
 
-		// Itertate over the targets of this file
-		for _, target := range targets {
-			// If we already found this target, skip it from now on
-			if knownTargets[target.path] {
-				continue
-			}
-			knownTargets[target.path] = true
+		// If we already found this target, skip it from now on
+		if knownTargets[target.path] {
+			continue
+		}
+		knownTargets[target.path] = true
 
-			// We only care about targets inside the directory being read
-			targetDir := gopath.Dir(target.path)
-			if targetDir != fileDir {
-				continue
-			}
-
-			// Open the target http file
-			targetFile, err := fs.Open(target.path)
-			if err != nil {
-				return nil, err
-			}
-			defer targetFile.Close()
-
-			// Get the stat info (this does not trigger the recipe unless Size()
-			// is invoked).
-			targetStat, err := targetFile.Stat()
-			if err != nil {
-				return nil, err
-			}
-
-			// Append the stat to the results
-			results = append(results, targetStat)
+		// We only care about targets inside the directory being read
+		targetDir := gopath.Dir(target.path)
+		if targetDir != fileDir {
+			continue
 		}
 
-		// @TODO Once KeepSources is implemented, keep the original stat
+		// Open the target http file
+		targetFile, err := fs.Open(target.path)
+		if err != nil {
+			return nil, err
+		}
+		defer targetFile.Close()
+
+		// Get the stat info (this does not trigger the recipe unless Size()
+		// is invoked).
+		targetStat, err := targetFile.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		// @TODO check if this target is overwriting a source, if so replace
+		// it instead of append.
+		stats = append(stats, targetStat)
 	}
 
-	// @TODO Filter results for dupes somehow, see BUG above
-
-	return results, nil
+	return stats, nil
 }
 
 func isPattern(str string) bool {
@@ -299,12 +274,12 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 //return nil
 //}
 
-func newTask(targetPaths []string, sources []*Source) *Task {
+func newTask(targetPath string, sources []*Source) *Task {
 	return nil
 }
 
 type Task struct {
-	targets []*Target
+	target *Target
 }
 
 func (t *Task) id() string {
@@ -313,10 +288,6 @@ func (t *Task) id() string {
 
 func (t *Task) current(other *Task) bool {
 	return false
-}
-
-func (t *Task) targetFile(path string) http.File {
-	return nil
 }
 
 func (t *Task) Target() io.Writer {
@@ -343,51 +314,12 @@ func (r *rule) Check() error {
 	return nil
 }
 
-func (r *rule) targetPathsForTargetPath(path string) []string {
-	targets := make([]string, 0)
-
-	//stem := ""
-	//match := false
-
-	//// Find out if a rule target matches this path, and if it is a pattern, get
-	//// the stem.
-	//for _, target := range r.targets {
-		//if isPattern(target) {
-			//if stem = findStem(path, target); stem != "" {
-				//match = true
-				//break
-			//}
-		//} else if isAbs(target) {
-			//if target == path {
-				//match = true
-				//break
-			//}
-		//}
-	//}
-
-	//// No target matched, return empty slice
-	//if !match {
-		//return targets
-	//}
-
-	//// Get a list of all targets this rule will produce for the given stem
-	//for _, target := range r.targets {
-		//if isPattern(target) {
-			//targets = append(targets, insertStem(target, stem))
-		//} else if isAbs(target) {
-			//targets = append(targets, target)
-		//}
-	//}
-
-	return targets
-}
-
-func (r *rule) targetPathsForSourcePath(path string) []*Target {
-	return nil
-}
-
-func (r *rule) sourcesForTargetPaths(targets []string, fs http.FileSystem) ([]*Source, error) {
+func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, error) {
 	return nil, nil
+}
+
+func (r *rule) findTarget(sourcePath string) *Target {
+	return nil
 }
 
 func newTarget(path string) *Target {
