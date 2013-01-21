@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-// RuleFsTests is a simple list that declares the tests ruleFs should pass.
 var RuleFsTests = []struct {
 	Name   string
 	Rule   *rule
@@ -46,7 +45,6 @@ var RuleFsTests = []struct {
 	},
 }
 
-// TestRuleFs_Tests executes the RuleFsTests declared above.
 func TestRuleFs_Tests(t *testing.T) {
 	for _, test := range RuleFsTests {
 		t.Logf("test: %s", test.Name)
