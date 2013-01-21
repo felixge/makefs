@@ -94,31 +94,31 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 
 	fileDir := gopath.Clean(file.path)
 
-	var knownTargets map[string]bool
+	knownTargets := make(map[string]bool)
 	for _, stat := range stats {
 		// Resolve full path
 		path := gopath.Join(fileDir, stat.Name())
 
-		// Returns the target this path is a source of
-		target := fs.rule.findTarget(path)
-		if target == nil {
+		// If this path is the source of a target, return the path of that target
+		targetPath := fs.rule.resolveTargetPath(path)
+		if targetPath == "" {
 			continue
 		}
 
 		// If we already found this target, skip it from now on
-		if knownTargets[target.path] {
+		if knownTargets[targetPath] {
 			continue
 		}
-		knownTargets[target.path] = true
+		knownTargets[targetPath] = true
 
 		// We only care about targets inside the directory being read
-		targetDir := gopath.Dir(target.path)
+		targetDir := gopath.Dir(targetPath)
 		if targetDir != fileDir {
 			continue
 		}
 
 		// Open the target http file
-		targetFile, err := fs.Open(target.path)
+		targetFile, err := fs.Open(targetPath)
 		if err != nil {
 			return nil, err
 		}

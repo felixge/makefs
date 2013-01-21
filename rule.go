@@ -35,8 +35,12 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 	return sources, nil
 }
 
-func (r *rule) findTarget(sourcePath string) *Target {
-	return nil
+func (r *rule) resolveTargetPath(sourcePath string) string {
+	if r.sources[0] == sourcePath {
+		return r.target
+	}
+
+	return ""
 }
 
 func isPattern(str string) bool {

@@ -27,8 +27,8 @@ var RuleFsTests = []struct {
 		Checks: []FsChecker{
 			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
 			&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
-			//&ExistCheck{"/foo.txt", true},
-			//&ExistCheck{"/foo.sha1", true},
+			&ExistCheck{"/foo.txt", true},
+			&ExistCheck{"/foo.sha1", true},
 		},
 	},
 }
