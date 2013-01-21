@@ -26,7 +26,7 @@ var RuleFsTests = []struct {
 		},
 		Checks: []FsChecker{
 			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
-			//&StatCheck{path: "/foo.sha1", size: 40},
+			&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
 			//&ExistCheck{"/foo.txt", true},
 			//&ExistCheck{"/foo.sha1", true},
 		},
@@ -153,6 +153,7 @@ func (check *ExistCheck) Check(fs http.FileSystem) error {
 type StatCheck struct {
 	path string
 	size int64
+	name string
 }
 
 func (check *StatCheck) Check(fs http.FileSystem) error {
@@ -166,10 +167,16 @@ func (check *StatCheck) Check(fs http.FileSystem) error {
 		return err
 	}
 
-	got := stat.Size()
-	if got != check.size {
-		return fmt.Errorf("unexpected size: %d", got)
+	gotSize := stat.Size()
+	if gotSize != check.size {
+		return fmt.Errorf("unexpected size: %d", gotSize)
 	}
+
+	gotName := stat.Name()
+	if gotName != check.name {
+		return fmt.Errorf("unexpected name: %s", gotName)
+	}
+
 	return nil
 }
 
