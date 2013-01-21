@@ -29,6 +29,7 @@ var RuleFsTests = []struct {
 			&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
 			&ExistCheck{"/foo.txt", true},
 			&ExistCheck{"/foo.sha1", true},
+			&ExistCheck{"/does-not-exist.sha1", false},
 		},
 	},
 }
