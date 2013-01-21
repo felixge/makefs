@@ -213,50 +213,12 @@ func Test_findStem(t *testing.T) {
 	}
 }
 
-var Rule_targetPathsForTargetPathTests = []struct {
-	Description string
-	RuleTarget  string
-	TargetPath  string
-	Expected    []string
-}{
-//{
-//Description: "1 abs match against 1 abs target",
-//TargetPath: "/foo.txt",
-//RuleTargets: []string{"/foo.txt"},
-//Expected: []string{"/foo.txt"},
-//},
-//{
-//Description: "0 abs matches against 1 abs target",
-//TargetPath: "/bar.txt",
-//RuleTargets: []string{"/foo.txt"},
-//Expected: []string{},
-//},
-//{
-//Description: "1 abs match against 2 abs targets",
-//TargetPath: "/bar.txt",
-//RuleTargets: []string{"/foo.txt", "/bar.txt"},
-//Expected: []string{"/foo.txt", "/bar.txt"},
-//},
-//{
-//Description: "0 abs match against 2 abs targets",
-//TargetPath: "/foobar.txt",
-//RuleTargets: []string{"/foo.txt", "/bar.txt"},
-//Expected: []string{},
-//},
-//{
-//Description: "1 abs match against 1 pattern target",
-//TargetPath: "/foo.txt",
-//RuleTargets: []string{"%.txt"},
-//Expected: []string{"/foo.txt"},
-//},
-//{
-//Description: "1 abs match against 2 pattern targets",
-//TargetPath: "/foo.txt",
-//RuleTargets: []string{"/%.txt", "a-%-b.txt"},
-//Expected: []string{"/foo.txt", "a-foo-b.txt"},
-//},
-}
-
+//var Rule_findSources = []struct {
+	//Description string
+	//RuleTarget  string
+	//TargetPath  string
+	//Expected    []string
+//}{
 //func TestRule_targetPathsForTargetPathTests(t *testing.T) {
 	//for _, test := range Rule_targetPathsForTargetPathTests {
 		//t.Logf(test.Description)

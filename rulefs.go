@@ -315,7 +315,24 @@ func (r *rule) Check() error {
 }
 
 func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, error) {
-	return nil, nil
+	stem := findStem(targetPath, r.target)
+	if stem == "" && targetPath != r.target {
+		return nil, nil
+	}
+
+	results := make([]*Source, 0)
+	for _, source := range r.sources {
+		source = insertStem(source, stem)
+		
+		sources, err := expand(source, fs)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, sources...)
+	}
+
+	return results, nil
 }
 
 func (r *rule) findTarget(sourcePath string) *Target {
@@ -335,3 +352,7 @@ func (t *Target) httpFile() http.File {
 }
 
 type Source struct{}
+
+func expand(pattern string, fs http.FileSystem) ([]*Source, error) {
+	return nil, nil
+}
