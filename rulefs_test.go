@@ -18,7 +18,7 @@ var RuleFsTests = []struct {
 	Checks []FsChecker
 }{
 	{
-		Name: "path to path",
+		Name: "1 abs target, 1 abs source",
 		Rule: &rule{
 			target:  "/foo.sha1",
 			sources: []string{"/foo.txt"},
@@ -30,6 +30,17 @@ var RuleFsTests = []struct {
 			&ExistCheck{"/foo.txt", true},
 			&ExistCheck{"/foo.sha1", true},
 			&ExistCheck{"/does-not-exist.sha1", false},
+		},
+	},
+	{
+		Name: "1 abs target, 2 abs sources",
+		Rule: &rule{
+			target:  "/yin-yang.txt",
+			sources: []string{"/yin.txt", "/yang.txt"},
+			recipe:  CatRecipe,
+		},
+		Checks: []FsChecker{
+			&ReadCheck{"/yin-yang.txt", "yin\nyang\n"},
 		},
 	},
 }
@@ -64,6 +75,16 @@ var Sha1Recipe = func(t *Task) error {
 
 	if _, err := io.WriteString(t.Target(), hex); err != nil {
 		return err
+	}
+	return nil
+}
+
+// CatRecipe takes several source files and concatenates them into one target.
+var CatRecipe = func(t *Task) error {
+	for _, source := range t.Sources() {
+		if _, err := io.Copy(t.Target(), source); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -30,6 +30,10 @@ func (t *Task) Source() *Source {
 	return t.sources[0]
 }
 
+func (t *Task) Sources() []*Source {
+	return t.sources
+}
+
 func (t *Task) startOnce() {
 	t.once.Do(func() { go t.run() })
 }
