@@ -70,7 +70,7 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	}
 
 	// Synthesize task
-	task := newTask(path, sources)
+	task := newTask(path, sources, fs.rule.recipe)
 
 	// Check if we already synthesized this task before and can reuse it.
 	if cachedTask, ok := fs.cache[path]; ok {

@@ -10,29 +10,39 @@ import (
 	"time"
 )
 
-func newTarget(path string) *Target {
-	return &Target{path: path}
-}
-
-type Target struct {
-	path      string
-	broadcast *broadcast
-}
-
-func (t *Target) httpFile() http.File {
-	return nil
-}
-
-func newTargetFile(task *Task, path string) *targetFile {
-	return &targetFile{
-		task: task,
+func newTarget(path string, startTaskOnce func()) *Target {
+	return &Target{
 		path: path,
+		startTaskOnce: startTaskOnce,
+		broadcast: newBroadcast(),
 	}
 }
 
+type Target struct {
+	path          string
+	broadcast     *broadcast
+	task          *Task
+	startTaskOnce func()
+}
+
+func (t *Target) Write(buf []byte) (int, error) {
+	return t.broadcast.Write(buf)
+}
+
+func (t *Target) closeWithError(err error) error {
+	return t.broadcast.CloseWithError(err)
+}
+
+func (t *Target) httpFile() http.File {
+	return newTargetFile(t)
+}
+
+func newTargetFile(target *Target) *targetFile {
+	return &targetFile{target: target}
+}
+
 type targetFile struct {
-	task   *Task
-	path   string
+	target *Target
 	reader io.Reader
 }
 
@@ -64,10 +74,8 @@ func (file *targetFile) Stat() (os.FileInfo, error) {
 }
 
 func (file *targetFile) client() io.Reader {
-	// make sure our recipe is executed
-	//file.task.start()
-	//return file.task.target.Client()
-	return nil
+	file.target.startTaskOnce()
+	return file.target.broadcast.Client()
 }
 
 type targetStat struct {
@@ -90,7 +98,7 @@ func (s *targetStat) Mode() os.FileMode {
 }
 
 func (s *targetStat) Name() string {
-	return gopath.Base(s.targetFile.path)
+	return gopath.Base(s.targetFile.target.path)
 }
 
 // Size determines the size of the target file by creating a new broadcast

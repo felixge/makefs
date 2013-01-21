@@ -28,7 +28,8 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 		return nil, nil
 	}
 
-	source := &Source{path: r.sources[0]}
+	sourcePath := r.sources[0]
+	source := &Source{path: sourcePath, fs: fs}
 	sources := []*Source{source}
 
 	return sources, nil
