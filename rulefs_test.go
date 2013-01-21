@@ -41,6 +41,7 @@ var RuleFsTests = []struct {
 		},
 		Checks: []FsChecker{
 			&ReadCheck{"/yin-yang.txt", "yin\nyang\n"},
+			&StatCheck{path: "/yin-yang.txt", size: 9, name: "yin-yang.txt"},
 		},
 	},
 }
