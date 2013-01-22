@@ -43,6 +43,22 @@ var RuleFsTests = []struct {
 			&StatCheck{path: "/yin-yang.txt", size: 9, name: "yin-yang.txt"},
 		},
 	},
+	{
+		Name: "1 pattern target, 1 pattern source",
+		Rule: &rule{
+			target:  "%.sha1",
+			sources: []string{"%.txt"},
+			recipe:  Sha1Recipe,
+		},
+		Checks: []FsChecker{
+			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			//&ReadCheck{"/sub/a.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			//&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
+			//&ExistCheck{"/foo.txt", true},
+			//&ExistCheck{"/foo.sha1", true},
+			//&ReadCheck{"/bar.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+		},
+	},
 }
 
 func TestRuleFs_Tests(t *testing.T) {

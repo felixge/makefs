@@ -5,26 +5,27 @@ import (
 )
 
 var FindStemTests = []struct {
-	Str     string
-	Pattern string
-	Expect  string
+	Path       string
+	Pattern    string
+	ExpectDir  string
+	ExpectStem string
 }{
-	{Str: "/foo.txt", Pattern: "%.txt", Expect: "/foo"},
-	{Str: "/foo.txt", Pattern: "/%.txt", Expect: "foo"},
-	{Str: "/bar/foo.txt", Pattern: "/%.txt", Expect: "bar/foo"},
-	{Str: "/foo.txta", Pattern: "%.txt", Expect: ""},
-	{Str: "/foo-bar.txt", Pattern: "%-bar.txt", Expect: "/foo"},
-	{Str: "/pages", Pattern: "/public/%.html", Expect: ""},
-	{Str: "/foo.txt", Pattern: ".txt", Expect: ""},
-	{Str: "/", Pattern: "%.txt", Expect: ""},
-	{Str: "/bar/foo.txt", Pattern: "/bar/%.txt", Expect: "foo"},
+	{"/foo.txt", "%.txt", "/", "foo"},
+	{"/bar/foo.txt", "%.txt", "/bar", "foo"},
+	{"/bar/foo.txt", "prefix-%.txt", "", ""},
+	{"/bar/prefix-foo.txt", "prefix-%.txt", "/bar", "foo"},
+	{"/bar/foo.txt", "%.txt-suffix", "", ""},
+	{"/bar/foo.txt-suffix", "%.txt-suffix", "/bar", "foo"},
 }
 
 func Test_findStem(t *testing.T) {
 	for _, test := range FindStemTests {
-		stem := findStem(test.Str, test.Pattern)
-		if stem != test.Expect {
-			t.Errorf("expected stem: %s, got: %s (%+v)", test.Expect, stem, test)
+		stem, dir := findStem(test.Path, test.Pattern)
+		if stem != test.ExpectStem {
+			t.Errorf("expected stem: %s, got: %s (%+v)", test.ExpectStem, stem, test)
+		}
+		if dir != test.ExpectDir {
+			t.Errorf("expected base: %s, got: %s (%+v)", test.ExpectDir, dir, test)
 		}
 	}
 }

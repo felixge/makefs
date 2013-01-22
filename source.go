@@ -3,12 +3,14 @@ package makefs
 import (
 	"fmt"
 	"net/http"
+	"os"
 )
 
 type Source struct {
 	path string
 	fs   http.FileSystem
 	file http.File
+	stat os.FileInfo
 }
 
 func (s *Source) open() error {

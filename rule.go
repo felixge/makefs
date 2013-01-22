@@ -2,9 +2,10 @@ package makefs
 
 import (
 	"net/http"
-	"strings"
+	"os"
 	gopath "path"
 	"regexp"
+	"strings"
 )
 
 type Recipe func(*Task) error
@@ -24,13 +25,44 @@ func (r *rule) Check() error {
 }
 
 func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, error) {
-	if targetPath != r.target {
+	var (
+		stem = ""
+		dir = ""
+	)
+
+	if targetPath == r.target {
+		// exact match, no stem / prefix
+	} else if isPattern(r.target) {
+		stem, dir = findStem(targetPath, r.target)
+		if stem == "" {
+			return nil, nil
+		}
+	} else {
 		return nil, nil
 	}
 
 	sources := make([]*Source, 0)
 	for _, source := range r.sources {
-		sources = append(sources, &Source{path: source, fs: fs})
+		sourcePath := gopath.Join(dir, insertStem(source, stem))
+		sourceFile, err := fs.Open(sourcePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		defer sourceFile.Close()
+
+		sourceStat, err := sourceFile.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		sources = append(sources, &Source{
+			path: sourcePath,
+			fs:   fs,
+			stat: sourceStat,
+		})
 	}
 
 	return sources, nil
@@ -52,23 +84,24 @@ func isAbs(str string) bool {
 	return gopath.IsAbs(str)
 }
 
-// findStem returns the value the % wildcard in pattern fills in the given str,
-// or "" if the pattern does not match.
-func findStem(path string, pattern string) string {
+func findStem(path string, pattern string) (string, string) {
+	dir := gopath.Dir(path)
+	name := gopath.Base(path)
+
 	pattern = regexp.QuoteMeta(pattern)
-	pattern = strings.Replace(pattern, "%", "(.+?)", 1) + "$"
+	pattern = "^" + strings.Replace(pattern, "%", "(.+)", 1) + "$"
 
 	matcher, err := regexp.Compile(pattern)
 	if err != nil {
 		panic("unreachable")
 	}
 
-	match := matcher.FindStringSubmatch(path)
+	match := matcher.FindStringSubmatch(name)
 	if len(match) != 2 {
-		return ""
+		return "", ""
 	}
 
-	return match[1]
+	return match[1], dir
 }
 
 func insertStem(pattern string, stem string) string {
