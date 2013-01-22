@@ -14,7 +14,7 @@ import (
 var RuleFsTests = []struct {
 	Name   string
 	Rule   *rule
-	Checks []FsChecker
+	Checks []Checker
 }{
 	{
 		Name: "1 abs target, 1 abs source",
@@ -23,7 +23,7 @@ var RuleFsTests = []struct {
 			sources: []string{"/foo.txt"},
 			recipe:  Sha1Recipe,
 		},
-		Checks: []FsChecker{
+		Checks: []Checker{
 			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
 			&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
 			&ExistCheck{"/foo.txt", true},
@@ -38,7 +38,7 @@ var RuleFsTests = []struct {
 			sources: []string{"/yin.txt", "/yang.txt"},
 			recipe:  CatRecipe,
 		},
-		Checks: []FsChecker{
+		Checks: []Checker{
 			&ReadCheck{"/yin-yang.txt", "yin\nyang\n"},
 			&StatCheck{path: "/yin-yang.txt", size: 9, name: "yin-yang.txt"},
 		},
@@ -50,7 +50,7 @@ var RuleFsTests = []struct {
 			sources: []string{"%.txt"},
 			recipe:  Sha1Recipe,
 		},
-		Checks: []FsChecker{
+		Checks: []Checker{
 			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
 			&ReadCheck{"/sub/a.sha1", "1fb217f037ece180e41303a2ac55aed51e3e473f"},
 			&ExistCheck{"/foo.txt", true},
@@ -66,7 +66,7 @@ var RuleFsTests = []struct {
 			sources: []string{"%.txt", "/yang.txt"},
 			recipe:  CatRecipe,
 		},
-		Checks: []FsChecker{
+		Checks: []Checker{
 			&ReadCheck{"/yin.txt", "yin\nyang\n"},
 			&ReadCheck{"/yang.txt", "yang\nyang\n"},
 			&ExistCheck{"/yin.txt", true},
@@ -118,8 +118,8 @@ var CatRecipe = func(t *Task) error {
 	return nil
 }
 
-// FsChecker is a simple interface for checking things inside a http.FileSystem
-type FsChecker interface {
+// Checker is a simple interface for checking things inside a http.FileSystem
+type Checker interface {
 	Check(fs http.FileSystem) error
 }
 
@@ -155,7 +155,10 @@ type ExistCheck struct {
 }
 
 func (check *ExistCheck) Check(fs http.FileSystem) error {
-	_, err := fs.Open(check.path)
+	file, err := fs.Open(check.path)
+	if file != nil {
+		defer file.Close()
+	}
 
 	existErr := os.IsNotExist(err)
 	if check.shouldExist {
@@ -177,6 +180,7 @@ func (check *ExistCheck) Check(fs http.FileSystem) error {
 	if err != nil {
 		return err
 	}
+	defer dirFile.Close()
 
 	stats, err := dirFile.Readdir(0)
 	if err != nil {

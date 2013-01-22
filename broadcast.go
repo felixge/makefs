@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// broadcast is a writer that broadcasts all writes to all registered clients.
+// broadcast is a Writer that broadcasts all writes to all registered clients.
 // Additionally it caches all writes, so that new clients won't miss any
 // data.
 type broadcast struct {
@@ -24,9 +24,11 @@ func newBroadcast() *broadcast {
 func (b *broadcast) Write(buf []byte) (int, error) {
 	b.cacheLock.Lock()
 	defer b.cacheLock.Unlock()
+
 	if b.closeErr == io.EOF {
 		return 0, io.ErrClosedPipe
-	} else if b.closeErr != nil {
+	}
+	if b.closeErr != nil {
 		return 0, b.closeErr
 	}
 

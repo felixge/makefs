@@ -1,6 +1,7 @@
 package makefs
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	gopath "path"
@@ -35,7 +36,7 @@ func (err errInvalidRule) Error() string {
 }
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
-	// Try to synthesize a task for the give path
+	// Try to synthesize a task for the given path
 	task, err := fs.task(path)
 	if err != nil {
 		return nil, err
@@ -63,9 +64,11 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	sources, err := fs.rule.findSources(path, fs.parent)
 	if err != nil {
 		return nil, err
-		// Note: This is different from len(sources) == 0, which is a valid task
-		// that does not depend on any sources (.PHONY in make).
-	} else if sources == nil {
+	}
+	
+	// Note: This is different from len(sources) == 0, which is a valid task
+	// that does not depend on any sources (.PHONY in make).
+	if sources == nil {
 		return nil, nil
 	}
 
@@ -86,8 +89,12 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 }
 
 func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
+	if count > 0 {
+		return nil, fmt.Errorf("makefs: count not supported for Readdir")
+	}
+
 	// Get stats from parent file system
-	stats, err := file.File.Readdir(count)
+	stats, err := file.File.Readdir(0)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +110,8 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 		targetPath, err := fs.rule.resolveTargetPath(sourcePath, fs.parent)
 		if err != nil {
 			return nil, err
-		} else if targetPath == "" {
+		}
+		if targetPath == "" {
 			continue
 		}
 

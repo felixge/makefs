@@ -102,7 +102,8 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 	sources, err := r.findSources(targetPath, fs)
 	if err != nil {
 		return "", err
-	} else if sources == nil {
+	}
+	if sources == nil {
 		return "", nil
 	}
 
@@ -125,6 +126,9 @@ func findStem(path string, pattern string) (string, string) {
 	if len(match) != 2 {
 		return "", ""
 	}
+
+	// BUG: check that dir is a suffix of the pattern dir, otherwise it is not
+	// a match.
 
 	return match[1], dir
 }

@@ -12,9 +12,9 @@ import (
 
 func newTarget(path string, startTaskOnce func()) *Target {
 	return &Target{
-		path: path,
+		path:          path,
 		startTaskOnce: startTaskOnce,
-		broadcast: newBroadcast(),
+		broadcast:     newBroadcast(),
 	}
 }
 
