@@ -77,7 +77,7 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 
 	// Check if we already synthesized this task before and can reuse it.
 	if cachedTask, ok := fs.cache[path]; ok {
-		if cachedTask.current(task) {
+		if cachedTask.equal(task) {
 			task = cachedTask
 		}
 	}

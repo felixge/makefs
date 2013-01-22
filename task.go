@@ -18,8 +18,27 @@ type Task struct {
 	once    sync.Once
 }
 
-func (t *Task) current(other *Task) bool {
-	return false
+// equal returns if the current task has the same sources (and modified times)
+// as the other task.
+func (t *Task) equal(other *Task) bool {
+	if t.target.path != other.target.path {
+		return false
+	}
+	if len(t.sources) != len(other.sources) {
+		return false
+	}
+
+	for i, source := range t.sources {
+		otherSource := other.sources[i]
+		if source.path != otherSource.path {
+			return false
+		}
+		if !source.stat.ModTime().Equal(otherSource.stat.ModTime()) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (t *Task) Target() *Target {

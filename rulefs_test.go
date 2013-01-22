@@ -1,9 +1,16 @@
 package makefs
 
 import (
+	"bytes"
+	"io"
 	"net/http"
+	"os"
+	"sync"
 	"testing"
+	"time"
 )
+
+const FooSha1 = "781b3017fe23bf261d65a6c3ed4d1af59dea790f"
 
 var RuleFsTests = []struct {
 	Name   string
@@ -18,7 +25,7 @@ var RuleFsTests = []struct {
 			recipe:  Sha1Recipe,
 		},
 		Checks: []Checker{
-			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			&ReadCheck{"/foo.sha1", FooSha1},
 			&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
 			&ExistCheck{"/foo.txt", true},
 			&ExistCheck{"/foo.sha1", true},
@@ -45,7 +52,7 @@ var RuleFsTests = []struct {
 			recipe:  Sha1Recipe,
 		},
 		Checks: []Checker{
-			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			&ReadCheck{"/foo.sha1", FooSha1},
 			&ReadCheck{"/sub/a.sha1", "1fb217f037ece180e41303a2ac55aed51e3e473f"},
 			&ExistCheck{"/foo.txt", true},
 			&ExistCheck{"/foo.sha1", true},
@@ -87,3 +94,66 @@ func TestRuleFs_Tests(t *testing.T) {
 	}
 }
 
+func TestRuleFs_RecipeCaching(t *testing.T) {
+	countLock := new(sync.Mutex)
+	count := 0
+
+	rule := &rule{
+		target: "%.sha1",
+		sources: []string{"%.txt"},
+		recipe: func(t *Task) error {
+			countLock.Lock()
+			count++
+			countLock.Unlock()
+
+			return Sha1Recipe(t)
+		},
+	}
+
+	fs, err := newRuleFs(http.Dir(fixturesDir), rule)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	readTarget := func() {
+		file, err := fs.Open("/foo.sha1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer file.Close()
+
+		buf := new(bytes.Buffer)
+		if _, err := io.Copy(buf, file); err != nil {
+			t.Error(err)
+		}
+		if buf.String() != FooSha1 {
+			t.Error(buf.String())
+		}
+	}
+
+	for i := 0; i < 3; i++ {
+		readTarget()
+		if count != 1 {
+			t.Error(count)
+		}
+	}
+
+	sourcePath := fixturesDir+"/foo.txt"
+	stat, err := os.Stat(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	atime := time.Now()
+	modtime := stat.ModTime().Add(1 * time.Second)
+	if err := os.Chtimes(sourcePath, atime, modtime); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		readTarget()
+		if count != 2 {
+			t.Error(count)
+		}
+	}
+}
