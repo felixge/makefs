@@ -136,11 +136,3 @@ func insertStem(pattern string, stem string) string {
 func isPattern(str string) bool {
 	return strings.Contains(str, "%")
 }
-
-func isGlob(str string) bool {
-	return strings.Contains(str, "*")
-}
-
-func expand(pattern string, fs http.FileSystem) ([]*Source, error) {
-	return nil, nil
-}
