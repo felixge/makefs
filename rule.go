@@ -21,6 +21,8 @@ func (r *rule) Check() error {
 		return errInvalidRule("does not contain any targets")
 	}
 
+	// @TODO: Do not allow rules with % on only one side
+
 	return nil
 }
 
@@ -68,20 +70,41 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 	return sources, nil
 }
 
-func (r *rule) resolveTargetPath(sourcePath string) string {
-	if r.sources[0] == sourcePath {
-		return r.target
+func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string, error) {
+	targetPath := r.target
+	if isPattern(targetPath) {
+		var (
+			stem = ""
+			dir = ""
+		)
+
+		for _, source := range r.sources {
+			if isPattern(source) {
+				stem, dir = findStem(sourcePath, source)
+				if stem != "" {
+					break
+				}
+			}
+		}
+
+		// Cannot resolve pattern target without stem
+		if stem == "" {
+			return "", nil
+		}
+
+		// But if we got a stem, let's insert it
+		targetPath = gopath.Join(dir, insertStem(r.target, stem))
 	}
 
-	return ""
-}
+	// For this targetPath to be valid, *all* sources need to exist
+	sources, err := r.findSources(targetPath, fs)
+	if err != nil {
+		return "", err
+	} else if sources == nil {
+		return "", nil
+	}
 
-func isPattern(str string) bool {
-	return strings.Contains(str, "%")
-}
-
-func isAbs(str string) bool {
-	return gopath.IsAbs(str)
+	return targetPath, nil
 }
 
 func findStem(path string, pattern string) (string, string) {
@@ -106,6 +129,10 @@ func findStem(path string, pattern string) (string, string) {
 
 func insertStem(pattern string, stem string) string {
 	return strings.Replace(pattern, "%", stem, -1)
+}
+
+func isPattern(str string) bool {
+	return strings.Contains(str, "%")
 }
 
 func isGlob(str string) bool {

@@ -97,11 +97,13 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 	knownTargets := make(map[string]bool)
 	for _, stat := range stats {
 		// Resolve full path
-		path := gopath.Join(fileDir, stat.Name())
+		sourcePath := gopath.Join(fileDir, stat.Name())
 
-		// If this path is the source of a target, return the path of that target
-		targetPath := fs.rule.resolveTargetPath(path)
-		if targetPath == "" {
+		// Resolve the targetPath for this souce (if any)
+		targetPath, err := fs.rule.resolveTargetPath(sourcePath, fs.parent)
+		if err != nil {
+			return nil, err
+		} else if targetPath == "" {
 			continue
 		}
 

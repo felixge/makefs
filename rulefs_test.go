@@ -52,11 +52,11 @@ var RuleFsTests = []struct {
 		},
 		Checks: []FsChecker{
 			&ReadCheck{"/foo.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
-			//&ReadCheck{"/sub/a.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
-			//&StatCheck{path: "/foo.sha1", size: 40, name: "foo.sha1"},
-			//&ExistCheck{"/foo.txt", true},
-			//&ExistCheck{"/foo.sha1", true},
-			//&ReadCheck{"/bar.sha1", "781b3017fe23bf261d65a6c3ed4d1af59dea790f"},
+			&ReadCheck{"/sub/a.sha1", "1fb217f037ece180e41303a2ac55aed51e3e473f"},
+			&ExistCheck{"/foo.txt", true},
+			&ExistCheck{"/foo.sha1", true},
+			&ExistCheck{"/sub/a.txt", true},
+			&ExistCheck{"/sub/a.sha1", true},
 		},
 	},
 }
