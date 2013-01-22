@@ -81,6 +81,8 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 		for _, source := range r.sources {
 			if isPattern(source) {
 				stem, dir = findStem(sourcePath, source)
+
+				// Use the first stem we find in a source
 				if stem != "" {
 					break
 				}
