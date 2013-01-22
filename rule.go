@@ -29,7 +29,7 @@ func (r *rule) Check() error {
 func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, error) {
 	var (
 		stem = ""
-		dir = ""
+		dir  = ""
 	)
 
 	if targetPath == r.target {
@@ -75,7 +75,7 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 	if isPattern(targetPath) {
 		var (
 			stem = ""
-			dir = ""
+			dir  = ""
 		)
 
 		for _, source := range r.sources {
@@ -111,26 +111,31 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 }
 
 func findStem(path string, pattern string) (string, string) {
-	dir := gopath.Dir(path)
-	name := gopath.Base(path)
+	var (
+		pathDir     = gopath.Dir(path)
+		pathBase    = gopath.Base(path)
+		patternDir  = gopath.Dir(pattern)
+		patternBase = gopath.Base(pattern)
+	)
 
-	pattern = regexp.QuoteMeta(pattern)
-	pattern = "^" + strings.Replace(pattern, "%", "(.+)", 1) + "$"
+	if patternDir != "." && !strings.HasSuffix(pathDir, patternDir) {
+		return "", ""
+	}
 
-	matcher, err := regexp.Compile(pattern)
+	patternBase = regexp.QuoteMeta(patternBase)
+	patternBase = "^" + strings.Replace(patternBase, "%", "(.+)", 1) + "$"
+
+	matcher, err := regexp.Compile(patternBase)
 	if err != nil {
 		panic("unreachable")
 	}
 
-	match := matcher.FindStringSubmatch(name)
+	match := matcher.FindStringSubmatch(pathBase)
 	if len(match) != 2 {
 		return "", ""
 	}
 
-	// BUG: check that dir is a suffix of the pattern dir, otherwise it is not
-	// a match.
-
-	return match[1], dir
+	return match[1], pathDir
 }
 
 func insertStem(pattern string, stem string) string {

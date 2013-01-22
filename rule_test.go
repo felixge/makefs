@@ -16,6 +16,8 @@ var FindStemTests = []struct {
 	{"/bar/prefix-foo.txt", "prefix-%.txt", "/bar", "foo"},
 	{"/bar/foo.txt", "%.txt-suffix", "", ""},
 	{"/bar/foo.txt-suffix", "%.txt-suffix", "/bar", "foo"},
+	{"/foo/bar/some.txt", "bar/%.txt", "/foo/bar", "some"},
+	{"/foo/not/some.txt", "bar/%.txt", "", ""},
 }
 
 func Test_findStem(t *testing.T) {
