@@ -59,6 +59,20 @@ var RuleFsTests = []struct {
 			&ExistCheck{"/sub/a.sha1", true},
 		},
 	},
+	{
+		Name: "1 pattern target, 1 pattern source, 1 abs source",
+		Rule: &rule{
+			target:  "%.txt",
+			sources: []string{"%.txt", "/yang.txt"},
+			recipe:  CatRecipe,
+		},
+		Checks: []FsChecker{
+			&ReadCheck{"/yin.txt", "yin\nyang\n"},
+			&ReadCheck{"/yang.txt", "yang\nyang\n"},
+			&ExistCheck{"/yin.txt", true},
+			&ExistCheck{"/yang.txt", true},
+		},
+	},
 }
 
 func TestRuleFs_Tests(t *testing.T) {
