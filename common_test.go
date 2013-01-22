@@ -1,8 +1,8 @@
 package makefs
 
 import (
-	"runtime"
 	"path/filepath"
+	"runtime"
 )
 
 // This file holds things that are shared across multiple test files inside the

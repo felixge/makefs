@@ -65,7 +65,7 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Note: This is different from len(sources) == 0, which is a valid task
 	// that does not depend on any sources (.PHONY in make).
 	if sources == nil {
