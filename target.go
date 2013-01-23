@@ -15,6 +15,7 @@ func newTarget(path string, startTaskOnce func()) *Target {
 		path:          path,
 		startTaskOnce: startTaskOnce,
 		broadcast:     newBroadcast(),
+		created:       time.Now(),
 	}
 }
 
@@ -23,6 +24,7 @@ type Target struct {
 	broadcast     *broadcast
 	task          *Task
 	startTaskOnce func()
+	created       time.Time
 }
 
 func (t *Target) Write(buf []byte) (int, error) {
@@ -88,8 +90,7 @@ func (s *targetStat) IsDir() bool {
 }
 
 func (s *targetStat) ModTime() time.Time {
-	// @TODO finish
-	return time.Now()
+	return s.targetFile.target.created
 }
 
 func (s *targetStat) Mode() os.FileMode {
