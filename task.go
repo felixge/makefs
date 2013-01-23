@@ -49,8 +49,12 @@ func (t *Task) Source() *Source {
 	return t.sources[0]
 }
 
-func (t *Task) Sources() []*Source {
-	return t.sources
+func (t *Task) Sources() map[string]*Source {
+	sources := make(map[string]*Source, len(t.sources))
+	for _, source := range t.sources {
+		sources[source.path] = source
+	}
+	return sources
 }
 
 func (t *Task) startOnce() {
