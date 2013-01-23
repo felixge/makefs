@@ -1,7 +1,6 @@
 package makefs
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	gopath "path"
@@ -88,11 +87,10 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	return task, nil
 }
 
-func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
-	if count > 0 {
-		return nil, fmt.Errorf("makefs: count not supported for Readdir")
-	}
+// BUG: ruleFs readdir may list target files more than once when using a 
+// a argument count > 0.
 
+func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
 	// Get stats from parent file system
 	stats, err := file.File.Readdir(0)
 	if err != nil {
