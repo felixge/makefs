@@ -56,7 +56,7 @@ func (p *printer) Write(buf []byte) (int, error) {
 }
 
 func (p *printer) Print(rootPath string) error {
-	if _, err := fmt.Fprintf(p.w, headerTemplate, p.pkgName); err != nil {
+	if _, err := fmt.Fprintf(p.w, headerTmpl, p.pkgName); err != nil {
 		return err
 	}
 	return p.printPath(rootPath)
