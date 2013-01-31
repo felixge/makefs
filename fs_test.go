@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestMakeFs_Make(t *testing.T) {
+func TestFs_Make(t *testing.T) {
 	fs := NewFs(http.Dir(fixturesDir))
 	fs.Make("%.sha1", []string{"%.txt"}, func(t *Task) error {
 		hash := sha1.New()
@@ -40,7 +40,7 @@ func TestMakeFs_Make(t *testing.T) {
 	}
 }
 
-func TestMakeFs_ExecMake(t *testing.T) {
+func TestFs_ExecMake(t *testing.T) {
 	fs := NewFs(http.Dir(fixturesDir))
 	fs.ExecMake("%.sha1", "%.txt", "cut", "-c", "1-11")
 
@@ -61,7 +61,7 @@ func TestMakeFs_ExecMake(t *testing.T) {
 	}
 }
 
-func TestMakeFs_SubFs(t *testing.T) {
+func TestFs_SubFs(t *testing.T) {
 	fs := NewFs(http.Dir(fixturesDir))
 	subFs := fs.SubFs("/sub")
 

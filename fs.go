@@ -1,16 +1,5 @@
 package makefs
 
-/*
-Vocabulary:
-
-* pattern: a string containing exactly one % sign.
-* glob: a string containing one or more * character. Single stars expand to any
-	character except for the path separator. Double stars expand to any character,
-	including the separator.
-
-
-*/
-
 import (
 	"net/http"
 	"os/exec"
