@@ -15,5 +15,5 @@ func TestFs_Fprint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("%s\n", buf)
+	fmt.Printf("%s\n", buf.Bytes()[0:200])
 }

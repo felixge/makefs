@@ -7,15 +7,63 @@ import (
 	"net/http"
 	"os"
 	gopath "path"
-	"time"
 )
 
-func Fprint(w io.Writer, fs http.FileSystem, pkg string, varName string) error {
-	return fprintPath(w, fs, "/")
+var headerTmpl = `// machine generated; do not edit by hand
+
+package %s
+
+func init() {
+	bundledFs = newBundleFs(map[string]MemoryFile{
+		"/": &MemoryFile{
+			name		: %#v,
+			isDir		: %#v,
+			modTime	: %#v,
+			data		: %#v,
+		}
+	})
+}
+`
+
+const fileTemplate = `{
+	name		: %#v,
+	isDir		: %#v,
+	modTime	: %#v,
+	data		: %#v,
+},
+`
+
+func Fprint(w io.Writer, fs http.FileSystem, pkgName string, varName string) error {
+	printer := &printer{
+		w:       w,
+		pkgName: pkgName,
+		varName: varName,
+		fs:      fs,
+	}
+	return printer.Print("/")
 }
 
-func fprintPath(w io.Writer, fs http.FileSystem, path string) error {
-	file, err := fs.Open(path)
+type printer struct {
+	w       io.Writer
+	pkgName string
+	varName string
+	fs      http.FileSystem
+	indent  int
+}
+
+func (p *printer) Write(buf []byte) (int, error) {
+	return p.w.Write(buf)
+}
+
+func (p *printer) Print(rootPath string) error {
+	if _, err := fmt.Fprintf(p.w, headerTemplate, p.pkgName); err != nil {
+		return err
+	}
+	return p.printPath(rootPath)
+}
+
+func (p *printer) printPath(path string) error {
+	file, err := p.fs.Open(path)
 	if err != nil {
 		return err
 	}
@@ -25,7 +73,7 @@ func fprintPath(w io.Writer, fs http.FileSystem, path string) error {
 		return err
 	}
 
-	if err := fprintFile(w, file, stat, path); err != nil {
+	if err := p.printFile(file, stat); err != nil {
 		return err
 	}
 
@@ -39,8 +87,7 @@ func fprintPath(w io.Writer, fs http.FileSystem, path string) error {
 	}
 
 	for _, stat := range stats {
-		filePath := gopath.Join(path, stat.Name())
-		if err := fprintPath(w, fs, filePath); err != nil {
+		if err := p.printPath(gopath.Join(path, stat.Name())); err != nil {
 			return err
 		}
 	}
@@ -48,14 +95,7 @@ func fprintPath(w io.Writer, fs http.FileSystem, path string) error {
 	return nil
 }
 
-const entry = `{
-	isDir: %#v,
-	modTime: %#v,
-	data: %#v,
-},
-`
-
-func fprintFile(w io.Writer, file http.File, stat os.FileInfo, path string) error {
+func (p *printer) printFile(file http.File, stat os.FileInfo) error {
 	var data string
 
 	isDir := stat.IsDir()
@@ -68,13 +108,18 @@ func fprintFile(w io.Writer, file http.File, stat os.FileInfo, path string) erro
 	}
 
 	if _, err := fmt.Fprintf(
-		w,
-		entry,
+		p,
+		fileTemplate,
+		stat.Name(),
 		isDir,
-		stat.ModTime().Format(time.RFC3339),
+		stat.ModTime().Unix(),
 		data,
 	); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (p *printer) fileEnd() error {
 	return nil
 }
