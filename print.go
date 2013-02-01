@@ -17,6 +17,7 @@ package %s
 import (
 	"os"
 	"time"
+	"syscall"
 )
 
 type {{prefix}}MemoryFile struct{
@@ -37,7 +38,7 @@ func (f *{{prefix}}MemoryFile) Close() error {
 	return nil
 }
 
-func (f {{prefix}}MemoryFile) Stat() (os.FileInfo, error) {
+func (f {{prefix}}MemoryFile) Stat() ({{prefix}}MemoryFileInfo, error) {
 	result := New{{prefix}}MemoryFileInfo(f)
 
 	return result, nil
@@ -52,26 +53,26 @@ func (f *{{prefix}}MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	var err error
 	if f.isDir {
-		return f.offset, &PathError{"seek", f.name, syscall.EISDIR}
+		return f.offset, &os.PathError{"seek", f.name, syscall.EISDIR}
 	}
 
-	start := 0
+	var start int64
 
 	switch whence {
-		case SEEK_SET:
+		case os.SEEK_SET:
 			start := 0
-		case SEEK_CUR:
+		case os.SEEK_CUR:
 			start := f.offset
-		case SEEK_END:
+		case os.SEEK_END:
 			start := f.size
 		default:
-			return f.offset, &PathError{"seek", f.name, syscall.EINVAL}
+			return f.offset, &os.PathError{"seek", f.name, syscall.EINVAL}
 	}
 
 	result := start + offset
 
 	if result < 0 {
-		return f.offset, &PathError{"seek", f.name, syscall.EINVAL}
+		return f.offset, &os.PathError{"seek", f.name, syscall.EINVAL}
 	}
 
 	f.offset = result
@@ -83,8 +84,8 @@ type {{prefix}}MemoryFileInfo struct{
 	f {{prefix}}MemoryFile
 }
 
-func New{{prefix}}MemoryFileInfo(f {{prefix}}MemoryFile) *{{prefix}}MemoryFileInfo {
-	return &{{prefix}}MemoryFileInfo{
+func New{{prefix}}MemoryFileInfo(f {{prefix}}MemoryFile) {{prefix}}MemoryFileInfo {
+	return {{prefix}}MemoryFileInfo{
 		f: f,
 	}
 }
@@ -94,12 +95,12 @@ func (f *{{prefix}}MemoryFileInfo) Size() int64 {
 }
 
 // @TODO
-func (f *{{prefix}}MemoryFileInfo) Mode() FileMode {
-	if f.isDir() {
-		return ModeDir
+func (f *{{prefix}}MemoryFileInfo) Mode() os.FileMode {
+	if f.IsDir() {
+		return os.ModeDir
 	}
 
-	return nil
+	return os.ModeDir
 }
 
 func (f *{{prefix}}MemoryFileInfo) ModTime() time.Time {
