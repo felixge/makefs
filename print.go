@@ -20,11 +20,11 @@ import (
 )
 
 type {{prefix}}MemoryFile struct{
-	Name    string
-	IsDir   bool
-	ModTime int64
-	Size    int64
-	Data    string
+	name    string
+	isDir   bool
+	modTime int64
+	size    int64
+	data    string
 	offset  int64
 }
 
@@ -50,8 +50,8 @@ func (f *{{prefix}}MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 }
 
 func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
-	if f.IsDir {
-		theErr := fmt.Errorf("File %s is a directory - can't seek", f.Name)
+	if f.isDir {
+		theErr := fmt.Errorf("File %s is a directory - can't seek", f.name)
 		err := &PathError{"seek", f.name, theErr}
 		return 0, err
 	}
@@ -64,11 +64,11 @@ func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
 		case SEEK_CUR:
 			start := f.offset
 		case SEEK_END:
-			start := f.Size - 1
+			start := f.size - 1
 	}
 
 	result := start + offset
-	if result < 0 || result > f.Size - 1 {
+	if result < 0 || result > f.size - 1 {
 		theErr := fmt.Errorf("Seek out of bounds")
 		err := &PathError{"seek", f.name, theErr}
 		return 0, err
@@ -89,25 +89,25 @@ func New{{prefix}}MemoryFileInfo(f {{prefix}}MemoryFile) *{{prefix}}MemoryFileIn
 	}
 }
 
-func (f *{{prefix}}MemoryFileInfo) Size() int64 {
-	return f.f.Size
+func (f *{{prefix}}MemoryFileInfo) size() int64 {
+	return f.f.size
 }
 
 // @TODO
 func (f *{{prefix}}MemoryFileInfo) Mode() FileMode {
-	if f.IsDir() {
+	if f.isDir() {
 		return ModeDir
 	}
 
 	return nil
 }
 
-func (f *{{prefix}}MemoryFileInfo) ModTime() time.Time {
-	return time.Unix(f.f.ModTime, 0)
+func (f *{{prefix}}MemoryFileInfo) modTime() time.Time {
+	return time.Unix(f.f.modTime, 0)
 }
 
-func (f *{{prefix}}MemoryFileInfo) IsDir() bool {
-	return f.f.IsDir
+func (f *{{prefix}}MemoryFileInfo) isDir() bool {
+	return f.f.isDir
 }
 
 func (f *{{prefix}}MemoryFileInfo) Sys() interface{} {
@@ -126,20 +126,20 @@ var footerTmpl = `
 `
 
 const fileTemplate = `%#v: &%sMemoryFile{
-	Name		: %#v,
-	IsDir		: %#v,
-	ModTime	: %#v,
-	Size	  : %#v,
-	Data		: %#v,
+	name		: %#v,
+	isDir		: %#v,
+	modTime	: %#v,
+	size	  : %#v,
+	data		: %#v,
 },
 `
 
-func Fprint(w io.Writer, fs http.FileSystem, pkgName string, varName string) error {
+func Fprint(w io.Writer, fs http.FileSystem, pkgname string, varname string) error {
 	printer := &printer{
 		w:       w,
-		pkgName: pkgName,
-		prefix:  varName,
-		varName: varName,
+		pkgname: pkgname,
+		prefix:  varname,
+		varname: varname,
 		fs:      fs,
 	}
 	return printer.Print("/")
@@ -147,16 +147,16 @@ func Fprint(w io.Writer, fs http.FileSystem, pkgName string, varName string) err
 
 type printer struct {
 	w       io.Writer
-	pkgName string
+	pkgname string
 	prefix  string
-	varName string
+	varname string
 	fs      http.FileSystem
 }
 
 func (p *printer) Print(rootPath string) error {
 	headerTmpl = strings.Replace(headerTmpl, "{{prefix}}", p.prefix, -1)
 
-	_, err := fmt.Fprintf(p.w, headerTmpl, p.pkgName)
+	_, err := fmt.Fprintf(p.w, headerTmpl, p.pkgname)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (p *printer) printPath(path string) error {
 		return err
 	}
 
-	if !stat.IsDir() {
+	if !stat.isDir() {
 		return nil
 	}
 
@@ -198,7 +198,7 @@ func (p *printer) printPath(path string) error {
 	}
 
 	for _, stat := range stats {
-		subPath := gopath.Join(path, stat.Name())
+		subPath := gopath.Join(path, stat.name())
 		if err := p.printPath(subPath); err != nil {
 			return err
 		}
@@ -210,7 +210,7 @@ func (p *printer) printPath(path string) error {
 func (p *printer) printFile(path string, file http.File, stat os.FileInfo) error {
 	var data string
 
-	isDir := stat.IsDir()
+	isDir := stat.isDir()
 
 	if !isDir {
 		d, err := ioutil.ReadAll(file)
