@@ -25,6 +25,7 @@ type {{prefix}}MemoryFile struct{
 	ModTime int64
 	Size    int64
 	Data    string
+	offset  int64
 }
 
 // @TODO
@@ -48,9 +49,30 @@ func (f *{{prefix}}MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 	return result, nil
 }
 
-// @TODO
 func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
-	return 0, nil
+	if f.IsDir {
+		return 0, fmt.Errorf("File %s is a directory - can't seek", f.Name)
+	}
+
+	start := 0
+
+	switch whence {
+		case SEEK_SET:
+			start := 0
+		case SEEK_CUR:
+			start := f.offset
+		case SEEK_END:
+			start := f.Size - 1
+	}
+
+	result := start + offset
+	if result < 0 || result > f.Size - 1 {
+		return 0, fmt.Errorf("Seek out of bounds")
+	}
+
+	f.offset = result
+
+	return result, nil
 }
 
 type {{prefix}}MemoryFileInfo struct{
