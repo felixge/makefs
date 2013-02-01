@@ -14,31 +14,97 @@ var headerTmpl = `// machine generated; do not edit by hand
 
 package %s
 
+import (
+	"os"
+	"time"
+)
+
 type {{prefix}}MemoryFile struct{
-	name string
-	isDir bool
-	modTime int64
-	data string
+	Name    string
+	IsDir   bool
+	ModTime int64
+	Size    int64
+	Data    string
 }
 
-func (f *{{prefix}}MemoryFile) Read() {
-
+// @TODO
+func (f *{{prefix}}MemoryFile) Read([]byte) (int, error) {
+	return 0, nil
 }
+
+func (f *{{prefix}}MemoryFile) Close() error {
+	return nil
+}
+
+func (f {{prefix}}MemoryFile) Stat() (os.FileInfo, error) {
+	result := New{{prefix}}MemoryFileInfo(f)
+
+	return result, nil
+}
+
+// @TODO
+func (f *{{prefix}}MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
+	result := []os.FileInfo{}
+	return result, nil
+}
+
+// @TODO
+func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
+}
+
+type {{prefix}}MemoryFileInfo struct{
+	f {{prefix}}MemoryFile
+}
+
+func New{{prefix}}MemoryFileInfo(f {{prefix}}MemoryFile) *{{prefix}}MemoryFileInfo {
+	return &{{prefix}}MemoryFileInfo{
+		f: f,
+	}
+}
+
+func (f *{{prefix}}MemoryFileInfo) Size() int64 {
+	return f.f.Size
+}
+
+// @TODO
+func (f *{{prefix}}MemoryFileInfo) Mode() FileMode {
+	if f.IsDir() {
+		return ModeDir
+	}
+
+	return nil
+}
+
+func (f *{{prefix}}MemoryFileInfo) ModTime() time.Time {
+	return time.Unix(f.f.ModTime, 0)
+}
+
+func (f *{{prefix}}MemoryFileInfo) IsDir() bool {
+	return f.f.IsDir
+}
+
+func (f *{{prefix}}MemoryFileInfo) Sys() interface{} {
+	return nil
+}
+
 
 func init() {
-	bundledFs = newBundleFs(map[string]{*{{prefix}}MemoryFile{
+	bundledFs = newBundleFs(map[string]*{{prefix}}MemoryFile{
 `
 
 var footerTmpl = `
-	})
+	},
+)
 }
 `
 
 const fileTemplate = `%#v: &%sMemoryFile{
-	name		: %#v,
-	isDir		: %#v,
-	modTime	: %#v,
-	data		: %#v,
+	Name		: %#v,
+	IsDir		: %#v,
+	ModTime	: %#v,
+	Size	  : %#v,
+	Data		: %#v,
 },
 `
 
@@ -82,7 +148,6 @@ func (p *printer) Print(rootPath string) error {
 }
 
 func (p *printer) printPath(path string) error {
-	fmt.Println("path", path)
 	file, err := p.fs.Open(path)
 	if err != nil {
 		return err
@@ -137,6 +202,7 @@ func (p *printer) printFile(path string, file http.File, stat os.FileInfo) error
 		stat.Name(),
 		isDir,
 		stat.ModTime().Unix(),
+		stat.Size(),
 		data,
 	)
 	return err
