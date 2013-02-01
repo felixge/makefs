@@ -50,10 +50,9 @@ func (f *{{prefix}}MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 }
 
 func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
+	var err error
 	if f.isDir {
-		theErr := fmt.Errorf("File %s is a directory - can't seek", f.name)
-		err := &PathError{"seek", f.name, theErr}
-		return 0, err
+		return f.offset, &PathError{"seek", f.name, syscall.EISDIR}
 	}
 
 	start := 0
@@ -64,16 +63,12 @@ func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
 		case SEEK_CUR:
 			start := f.offset
 		case SEEK_END:
-			start := f.size - 1
+			start := f.size
+		default:
+			return f.offset, &PathError{"seek", f.name, syscall.EINVAL}
 	}
 
 	result := start + offset
-	if result < 0 || result > f.size - 1 {
-		theErr := fmt.Errorf("Seek out of bounds")
-		err := &PathError{"seek", f.name, theErr}
-		return 0, err
-	}
-
 	f.offset = result
 
 	return result, nil
