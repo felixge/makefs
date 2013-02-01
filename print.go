@@ -69,6 +69,11 @@ func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	}
 
 	result := start + offset
+
+	if result < 0 {
+		return f.offset, &PathError{"seek", f.name, syscall.EINVAL}
+	}
+
 	f.offset = result
 
 	return result, nil
@@ -183,7 +188,7 @@ func (p *printer) printPath(path string) error {
 		return err
 	}
 
-	if !stat.isDir() {
+	if !stat.IsDir() {
 		return nil
 	}
 
@@ -193,7 +198,7 @@ func (p *printer) printPath(path string) error {
 	}
 
 	for _, stat := range stats {
-		subPath := gopath.Join(path, stat.name())
+		subPath := gopath.Join(path, stat.Name())
 		if err := p.printPath(subPath); err != nil {
 			return err
 		}
@@ -205,7 +210,7 @@ func (p *printer) printPath(path string) error {
 func (p *printer) printFile(path string, file http.File, stat os.FileInfo) error {
 	var data string
 
-	isDir := stat.isDir()
+	isDir := stat.IsDir()
 
 	if !isDir {
 		d, err := ioutil.ReadAll(file)
