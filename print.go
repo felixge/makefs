@@ -51,7 +51,9 @@ func (f *{{prefix}}MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 
 func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	if f.IsDir {
-		return 0, fmt.Errorf("File %s is a directory - can't seek", f.Name)
+		theErr := fmt.Errorf("File %s is a directory - can't seek", f.Name)
+		err := &PathError{"seek", f.name, theErr}
+		return 0, err
 	}
 
 	start := 0
@@ -67,7 +69,9 @@ func (f *{{prefix}}MemoryFile) Seek(offset int64, whence int) (int64, error) {
 
 	result := start + offset
 	if result < 0 || result > f.Size - 1 {
-		return 0, fmt.Errorf("Seek out of bounds")
+		theErr := fmt.Errorf("Seek out of bounds")
+		err := &PathError{"seek", f.name, theErr}
+		return 0, err
 	}
 
 	f.offset = result
