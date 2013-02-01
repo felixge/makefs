@@ -89,7 +89,7 @@ func New{{prefix}}MemoryFileInfo(f {{prefix}}MemoryFile) *{{prefix}}MemoryFileIn
 	}
 }
 
-func (f *{{prefix}}MemoryFileInfo) size() int64 {
+func (f *{{prefix}}MemoryFileInfo) Size() int64 {
 	return f.f.size
 }
 
@@ -102,11 +102,11 @@ func (f *{{prefix}}MemoryFileInfo) Mode() FileMode {
 	return nil
 }
 
-func (f *{{prefix}}MemoryFileInfo) modTime() time.Time {
+func (f *{{prefix}}MemoryFileInfo) ModTime() time.Time {
 	return time.Unix(f.f.modTime, 0)
 }
 
-func (f *{{prefix}}MemoryFileInfo) isDir() bool {
+func (f *{{prefix}}MemoryFileInfo) IsDir() bool {
 	return f.f.isDir
 }
 
