@@ -223,5 +223,56 @@ func TestMemoryFile_Stat_Dir(t *testing.T) {
 	if mode&0555 != 0555 {
 		t.Errorf("unexpected permission: 0%o", mode)
 	}
+}
 
+func TestMemoryFile_Readdir(t *testing.T) {
+	foo := &MemoryFile{Name: "foo"}
+	bar := &MemoryFile{Name: "bar"}
+
+	fooStat, _ := foo.Stat()
+	barStat, _ := bar.Stat()
+
+	// count = 0
+	{
+		file := &MemoryFile{IsDir: true, ReaddirStats: []os.FileInfo{fooStat, barStat}}
+		stats, err := file.Readdir(0)
+		if err != nil {
+			t.Fatal(err)
+		} else if l := len(stats); l != 2 {
+			t.Fatal(l)
+		} else if stats[0] != fooStat {
+			t.Fatal(stats[0])
+		} else if stats[1] != barStat {
+			t.Fatal(stats[1])
+		}
+	}
+
+	// count = 1
+	{
+		file := &MemoryFile{IsDir: true, ReaddirStats: []os.FileInfo{fooStat, barStat}}
+		stats1, err := file.Readdir(1)
+		if err != nil {
+			t.Fatal(err)
+		} else if l := len(stats1); l != 1 {
+			t.Fatal(l)
+		} else if stats1[0] != fooStat {
+			t.Fatal(stats1[0])
+		}
+
+		stats2, err := file.Readdir(1)
+		if err != nil {
+			t.Fatal(err)
+		} else if l := len(stats2); l != 1 {
+			t.Fatal(l)
+		} else if stats2[0] != barStat {
+			t.Fatal(stats2[0])
+		}
+
+		stats3, err := file.Readdir(1)
+		if err != io.EOF {
+			t.Fatal(err)
+		} else if stats3 != nil {
+			t.Fatal(stats3)
+		}
+	}
 }

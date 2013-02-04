@@ -8,12 +8,14 @@ import (
 )
 
 type MemoryFile struct {
-	Name    string
-	IsDir   bool
-	Data    string
-	ModTime int64
-	offset  int64
-	closed  bool
+	Name          string
+	IsDir         bool
+	Data          string
+	ModTime       int64
+	ReaddirStats  []os.FileInfo
+	readdirOffset int
+	readOffset    int64
+	closed        bool
 }
 
 func (f *MemoryFile) Read(buf []byte) (int, error) {
@@ -21,12 +23,12 @@ func (f *MemoryFile) Read(buf []byte) (int, error) {
 		return -1, &os.PathError{"read", f.Name, syscall.EBADF}
 	}
 
-	if f.offset >= int64(len(f.Data)) {
+	if f.readOffset >= int64(len(f.Data)) {
 		return 0, io.EOF
 	}
 
-	n := copy(buf, f.Data[f.offset:])
-	f.offset += int64(n)
+	n := copy(buf, f.Data[f.readOffset:])
+	f.readOffset += int64(n)
 	return n, nil
 }
 
@@ -40,13 +42,24 @@ func (f *MemoryFile) Close() error {
 }
 
 func (f *MemoryFile) Stat() (os.FileInfo, error) {
+	if f.closed {
+		return nil, &os.PathError{"fstat", f.Name, syscall.EBADF}
+	}
+
 	return newMemoryFileInfo(f), nil
 }
 
-// @TODO
-func (f *MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
-	result := []os.FileInfo{}
-	return result, nil
+func (f *MemoryFile) Readdir(count int) ([]os.FileInfo, error) {
+	if f.readdirOffset >= len(f.ReaddirStats) {
+		return nil, io.EOF
+	}
+
+	stats := f.ReaddirStats[f.readdirOffset:]
+	if count > 0 {
+		stats = stats[0:count]
+	}
+	f.readdirOffset += len(stats)
+	return stats, nil
 }
 
 func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
@@ -55,7 +68,7 @@ func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	}
 
 	if f.IsDir {
-		return f.offset, &os.PathError{"lseek", f.Name, syscall.EISDIR}
+		return f.readOffset, &os.PathError{"lseek", f.Name, syscall.EISDIR}
 	}
 
 	var start int64
@@ -64,20 +77,20 @@ func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	case os.SEEK_SET:
 		start = 0
 	case os.SEEK_CUR:
-		start = f.offset
+		start = f.readOffset
 	case os.SEEK_END:
 		start = int64(len(f.Data))
 	default:
-		return f.offset, &os.PathError{"lseek", f.Name, syscall.EINVAL}
+		return f.readOffset, &os.PathError{"lseek", f.Name, syscall.EINVAL}
 	}
 
 	result := start + offset
 
 	if result < 0 {
-		return f.offset, &os.PathError{"lseek", f.Name, syscall.EINVAL}
+		return f.readOffset, &os.PathError{"lseek", f.Name, syscall.EINVAL}
 	}
 
-	f.offset = result
+	f.readOffset = result
 
 	return result, nil
 }
