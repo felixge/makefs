@@ -2,17 +2,49 @@ package makefs
 
 import (
 	"io"
+	"net/http"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 )
+
+type MemoryFs struct {
+	root MemoryFile
+}
+
+func NewMemoryFs(root MemoryFile) *MemoryFs {
+	return &MemoryFs{root: root}
+}
+
+func (f *MemoryFs) Open(path string) (http.File, error) {
+	current := f.root
+	if path == "/" {
+		return &current, nil
+	}
+
+	parts := strings.Split(path[1:], "/")
+
+	for i, part := range parts {
+		for _, file := range current.Children {
+			if file.Name == part {
+				current = file
+				if i+1>=len(parts) {
+					return &current, nil
+				}
+				break
+			}
+		}
+	}
+	return nil, &os.PathError{"open", path, os.ErrNotExist}
+}
 
 type MemoryFile struct {
 	Name          string
 	IsDir         bool
 	Data          string
 	ModTime       int64
-	ReaddirStats  []os.FileInfo
+	Children      []MemoryFile
 	readdirOffset int
 	readOffset    int64
 	closed        bool
@@ -50,14 +82,20 @@ func (f *MemoryFile) Stat() (os.FileInfo, error) {
 }
 
 func (f *MemoryFile) Readdir(count int) ([]os.FileInfo, error) {
-	if f.readdirOffset >= len(f.ReaddirStats) {
+	if f.readdirOffset >= len(f.Children) {
 		return nil, io.EOF
 	}
 
-	stats := f.ReaddirStats[f.readdirOffset:]
+	files := f.Children[f.readdirOffset:]
 	if count > 0 {
-		stats = stats[0:count]
+		files = files[0:count]
 	}
+
+	stats := make([]os.FileInfo, len(files))
+	for i, _ := range files {
+		stats[i] = newMemoryFileInfo(&files[i])
+	}
+
 	f.readdirOffset += len(stats)
 	return stats, nil
 }

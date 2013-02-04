@@ -7,6 +7,49 @@ import (
 	"time"
 )
 
+func TestMemoryFs_Open(t *testing.T) {
+	root := MemoryFile{IsDir: true, Children: []MemoryFile{{Name: "foo"}}}
+	fs := NewMemoryFs(root)
+
+	// root
+	{
+		file, err := fs.Open("/")
+		defer file.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if memoryFile := file.(*MemoryFile); memoryFile == &root {
+			t.Fatal("expected copy")
+		}
+
+		if stat, err := file.Stat(); err != nil {
+			t.Fatal(err)
+		} else if !stat.IsDir() {
+			t.Error(err)
+		}
+	}
+
+	// sub file
+	file, err := fs.Open("/foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	if stat, err := file.Stat(); err != nil {
+		t.Fatal(err)
+	} else if stat.IsDir() {
+		t.Fatal(err)
+	} else if name := stat.Name(); name != "foo" {
+		t.Fatal(name)
+	}
+
+	// non-existing file
+	if _, err := fs.Open("/does-not-exist"); !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+}
+
 func TestMemoryFile_Read(t *testing.T) {
 	data := "12345"
 	file := &MemoryFile{Data: data}
@@ -226,37 +269,34 @@ func TestMemoryFile_Stat_Dir(t *testing.T) {
 }
 
 func TestMemoryFile_Readdir(t *testing.T) {
-	foo := &MemoryFile{Name: "foo"}
-	bar := &MemoryFile{Name: "bar"}
-
-	fooStat, _ := foo.Stat()
-	barStat, _ := bar.Stat()
+	foo := MemoryFile{Name: "foo"}
+	bar := MemoryFile{Name: "bar"}
 
 	// count = 0
 	{
-		file := &MemoryFile{IsDir: true, ReaddirStats: []os.FileInfo{fooStat, barStat}}
+		file := &MemoryFile{IsDir: true, Children: []MemoryFile{foo, bar}}
 		stats, err := file.Readdir(0)
 		if err != nil {
 			t.Fatal(err)
 		} else if l := len(stats); l != 2 {
 			t.Fatal(l)
-		} else if stats[0] != fooStat {
-			t.Fatal(stats[0])
-		} else if stats[1] != barStat {
-			t.Fatal(stats[1])
+		} else if name := stats[0].Name(); name != foo.Name {
+			t.Fatal(name)
+		} else if name := stats[1].Name(); name != bar.Name {
+			t.Fatal(name)
 		}
 	}
 
 	// count = 1
 	{
-		file := &MemoryFile{IsDir: true, ReaddirStats: []os.FileInfo{fooStat, barStat}}
+		file := &MemoryFile{IsDir: true, Children: []MemoryFile{foo, bar}}
 		stats1, err := file.Readdir(1)
 		if err != nil {
 			t.Fatal(err)
 		} else if l := len(stats1); l != 1 {
 			t.Fatal(l)
-		} else if stats1[0] != fooStat {
-			t.Fatal(stats1[0])
+		} else if name := stats1[0].Name(); name != foo.Name {
+			t.Fatal(name)
 		}
 
 		stats2, err := file.Readdir(1)
@@ -264,8 +304,8 @@ func TestMemoryFile_Readdir(t *testing.T) {
 			t.Fatal(err)
 		} else if l := len(stats2); l != 1 {
 			t.Fatal(l)
-		} else if stats2[0] != barStat {
-			t.Fatal(stats2[0])
+		} else if name := stats2[0].Name(); name != bar.Name {
+			t.Fatal(name)
 		}
 
 		stats3, err := file.Readdir(1)
