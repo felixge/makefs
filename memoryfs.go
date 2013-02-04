@@ -129,7 +129,7 @@ func (f *memoryFileInfo) IsDir() bool {
 	return f.file.IsDir
 }
 
-// @TODO Should we return something here?
 func (f *memoryFileInfo) Sys() interface{} {
+	// @TODO Should we return something here?
 	return nil
 }
