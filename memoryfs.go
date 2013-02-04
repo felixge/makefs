@@ -1,7 +1,6 @@
 package makefs
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"syscall"
@@ -19,8 +18,7 @@ type MemoryFile struct {
 
 func (f *MemoryFile) Read(buf []byte) (int, error) {
 	if f.closed {
-		// @TODO: POSIX compliance.
-		return 0, fmt.Errorf("can not read from %s, already closed", f.Name)
+		return -1, &os.PathError{"read", f.Name, syscall.EBADF}
 	}
 
 	if f.offset >= int64(len(f.Data)) {
@@ -34,8 +32,7 @@ func (f *MemoryFile) Read(buf []byte) (int, error) {
 
 func (f *MemoryFile) Close() error {
 	if f.closed {
-		// @TODO: POSIX compliance.
-		return fmt.Errorf("can close %s, already closed", f.Name)
+		return &os.PathError{"close", f.Name, syscall.EBADF}
 	}
 
 	f.closed = true
@@ -53,8 +50,12 @@ func (f *MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 }
 
 func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
+	if f.closed {
+		return -1, &os.PathError{"lseek", f.Name, syscall.EBADF}
+	}
+
 	if f.IsDir {
-		return f.offset, &os.PathError{"seek", f.Name, syscall.EISDIR}
+		return f.offset, &os.PathError{"lseek", f.Name, syscall.EISDIR}
 	}
 
 	var start int64
@@ -67,13 +68,13 @@ func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	case os.SEEK_END:
 		start = int64(len(f.Data))
 	default:
-		return f.offset, &os.PathError{"seek", f.Name, syscall.EINVAL}
+		return f.offset, &os.PathError{"lseek", f.Name, syscall.EINVAL}
 	}
 
 	result := start + offset
 
 	if result < 0 {
-		return f.offset, &os.PathError{"seek", f.Name, syscall.EINVAL}
+		return f.offset, &os.PathError{"lseek", f.Name, syscall.EINVAL}
 	}
 
 	f.offset = result

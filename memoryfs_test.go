@@ -35,6 +35,113 @@ func TestMemoryFile_Read(t *testing.T) {
 	}
 }
 
+func TestMemoryFile_Seek_SET(t *testing.T) {
+	data := "12345"
+	file := &MemoryFile{Data: data}
+	buf := make([]byte, len(data))
+
+	readByte2To4 := func() {
+		if n, err := file.Seek(2, os.SEEK_SET); err != nil {
+			t.Fatal(err)
+		} else if n != 2 {
+			t.Fatal(n)
+		}
+
+		if n, err := file.Read(buf[0:2]); err != nil {
+			t.Fatal(err)
+		} else if n != 2 {
+			t.Fatal(n)
+		} else if str := string(buf[0:2]); str != data[2:4] {
+			t.Fatal(str)
+		}
+	}
+
+	// 2x - makes sure SEEK_SET is absolute
+	readByte2To4()
+	readByte2To4()
+
+	// negative seek should give error
+	if _, err := file.Seek(-1, os.SEEK_SET); err == nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMemoryFile_Seek_CUR(t *testing.T) {
+	data := "12345"
+	file := &MemoryFile{Data: data}
+	buf := make([]byte, len(data))
+
+	if n, err := file.Seek(1, os.SEEK_CUR); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatal(n)
+	}
+
+	if n, err := file.Read(buf[0:2]); err != nil {
+		t.Fatal(err)
+	} else if n != 2 {
+		t.Fatal(n)
+	} else if str := string(buf[0:2]); str != data[1:3] {
+		t.Fatal(str)
+	}
+
+	if n, err := file.Seek(1, os.SEEK_CUR); err != nil {
+		t.Fatal(err)
+	} else if n != 4 {
+		t.Fatal(n)
+	}
+
+	if n, err := file.Read(buf[0:2]); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatal(n)
+	} else if str := string(buf[0:n]); str != data[4:5] {
+		t.Fatal(str)
+	}
+
+	if n, err := file.Seek(-1, os.SEEK_CUR); err != nil {
+		t.Fatal(err)
+	} else if n != 4 {
+		t.Fatal(n)
+	}
+
+	if n, err := file.Read(buf[0:2]); err != nil {
+		t.Fatal(err)
+	} else if n != 1 {
+		t.Fatal(n)
+	} else if str := string(buf[0:n]); str != data[4:5] {
+		t.Fatal(str)
+	}
+
+	if _, err := file.Seek(-100, os.SEEK_CUR); err == nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMemoryFile_Seek_END(t *testing.T) {
+	data := "12345"
+	file := &MemoryFile{Data: data}
+	buf := make([]byte, len(data))
+
+	if n, err := file.Seek(-2, os.SEEK_END); err != nil {
+		t.Fatal(err)
+	} else if n != 3 {
+		t.Fatal(n)
+	}
+
+	if n, err := file.Read(buf[0:2]); err != nil {
+		t.Fatal(err)
+	} else if n != 2 {
+		t.Fatal(n)
+	} else if str := string(buf[0:2]); str != data[3:5] {
+		t.Fatal(str)
+	}
+
+	if _, err := file.Seek(-100, os.SEEK_END); err == nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMemoryFile_Close(t *testing.T) {
 	file := &MemoryFile{Data: "foobar"}
 	buf := make([]byte, 100)
@@ -45,7 +152,13 @@ func TestMemoryFile_Close(t *testing.T) {
 
 	if n, err := file.Read(buf); err == nil {
 		t.Fatal(err)
-	} else if n != 0 {
+	} else if n != -1 {
+		t.Fatal(err)
+	}
+
+	if n, err := file.Seek(2, os.SEEK_SET); err == nil {
+		t.Fatal(err)
+	} else if n != -1 {
 		t.Fatal(err)
 	}
 
