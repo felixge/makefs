@@ -9,11 +9,10 @@ import (
 )
 
 type MemoryFile struct {
-	name    string
-	isDir   bool
-	modTime int64
-	size    int64
-	data    string
+	Name    string
+	IsDir   bool
+	Data    string
+	ModTime int64
 	offset  int64
 	closed  bool
 }
@@ -21,14 +20,14 @@ type MemoryFile struct {
 func (f *MemoryFile) Read(buf []byte) (int, error) {
 	if f.closed {
 		// @TODO: POSIX compliance.
-		return 0, fmt.Errorf("can not read from %s, already closed", f.name)
+		return 0, fmt.Errorf("can not read from %s, already closed", f.Name)
 	}
 
-	if f.offset >= int64(len(f.data)) {
+	if f.offset >= int64(len(f.Data)) {
 		return 0, io.EOF
 	}
 
-	n := copy(buf, f.data[f.offset:])
+	n := copy(buf, f.Data[f.offset:])
 	f.offset += int64(n)
 	return n, nil
 }
@@ -36,17 +35,15 @@ func (f *MemoryFile) Read(buf []byte) (int, error) {
 func (f *MemoryFile) Close() error {
 	if f.closed {
 		// @TODO: POSIX compliance.
-		return fmt.Errorf("can close %s, already closed", f.name)
+		return fmt.Errorf("can close %s, already closed", f.Name)
 	}
 
 	f.closed = true
 	return nil
 }
 
-func (f MemoryFile) Stat() (MemoryFileInfo, error) {
-	result := NewMemoryFileInfo(f)
-
-	return result, nil
+func (f *MemoryFile) Stat() (os.FileInfo, error) {
+	return newMemoryFileInfo(f), nil
 }
 
 // @TODO
@@ -56,8 +53,8 @@ func (f *MemoryFile) ReadDir(count int) ([]os.FileInfo, error) {
 }
 
 func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
-	if f.isDir {
-		return f.offset, &os.PathError{"seek", f.name, syscall.EISDIR}
+	if f.IsDir {
+		return f.offset, &os.PathError{"seek", f.Name, syscall.EISDIR}
 	}
 
 	var start int64
@@ -68,15 +65,15 @@ func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	case os.SEEK_CUR:
 		start = f.offset
 	case os.SEEK_END:
-		start = f.size
+		start = int64(len(f.Data))
 	default:
-		return f.offset, &os.PathError{"seek", f.name, syscall.EINVAL}
+		return f.offset, &os.PathError{"seek", f.Name, syscall.EINVAL}
 	}
 
 	result := start + offset
 
 	if result < 0 {
-		return f.offset, &os.PathError{"seek", f.name, syscall.EINVAL}
+		return f.offset, &os.PathError{"seek", f.Name, syscall.EINVAL}
 	}
 
 	f.offset = result
@@ -84,37 +81,41 @@ func (f *MemoryFile) Seek(offset int64, whence int) (int64, error) {
 	return result, nil
 }
 
-type MemoryFileInfo struct {
-	f MemoryFile
+func newMemoryFileInfo(file *MemoryFile) *memoryFileInfo {
+	return &memoryFileInfo{file: file}
 }
 
-func NewMemoryFileInfo(f MemoryFile) MemoryFileInfo {
-	return MemoryFileInfo{
-		f: f,
-	}
+type memoryFileInfo struct {
+	file *MemoryFile
 }
 
-func (f *MemoryFileInfo) Size() int64 {
-	return f.f.size
+func (f *memoryFileInfo) Name() string {
+	return f.file.Name
 }
 
-// @TODO
-func (f *MemoryFileInfo) Mode() os.FileMode {
+func (f *memoryFileInfo) Size() int64 {
+	return int64(len(f.file.Data))
+}
+
+func (f *memoryFileInfo) Mode() os.FileMode {
+	// 4 = read
+	mode := os.FileMode(0444)
 	if f.IsDir() {
-		return os.ModeDir
+		// 1 = execute
+		mode = mode | os.ModeDir | 0111
 	}
-
-	return os.ModeDir
+	return mode
 }
 
-func (f *MemoryFileInfo) ModTime() time.Time {
-	return time.Unix(f.f.modTime, 0)
+func (f *memoryFileInfo) ModTime() time.Time {
+	return time.Unix(f.file.ModTime, 0)
 }
 
-func (f *MemoryFileInfo) IsDir() bool {
-	return f.f.isDir
+func (f *memoryFileInfo) IsDir() bool {
+	return f.file.IsDir
 }
 
-func (f *MemoryFileInfo) Sys() interface{} {
+// @TODO Should we return something here?
+func (f *memoryFileInfo) Sys() interface{} {
 	return nil
 }
