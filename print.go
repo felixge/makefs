@@ -51,7 +51,9 @@ func (p *printer) endLine(str string, args ...interface{}) {
 func (p *printer) print(rootPath string) error {
 	p.line("package %s", p.pkgName)
 	p.line("")
-	p.line("// machine generated; do not edit")
+	p.line("/* machine generated; do not edit */")
+	p.line("")
+	p.line(`import "github.com/felixge/makefs"`)
 	p.line("")
 	p.line("func init() {")
 	p.indent++
