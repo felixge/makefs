@@ -3,72 +3,64 @@ package makefs
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	gopath "path"
 	"strings"
 )
 
-var headerTmpl = `// machine generated; do not edit by hand
-
-package %s
-
-func init() {
-	bundledFs = newBundleFs(map[string]*{{prefix}}MemoryFile{
-`
-
-var footerTmpl = `
-	},
-)
-}
-`
-
-const fileTemplate = `%#v: &%sMemoryFile{
-	name		: %#v,
-	isDir		: %#v,
-	modTime	: %#v,
-	size	  : %#v,
-	data		: %#v,
-},
-`
-
-func Fprint(w io.Writer, fs http.FileSystem, pkgname string, varname string) error {
+func Fprint(w io.Writer, fs http.FileSystem, pkgName string, varName string) error {
 	printer := &printer{
 		w:       w,
-		pkgname: pkgname,
-		prefix:  varname,
-		varname: varname,
+		pkgName: pkgName,
+		varName: varName,
 		fs:      fs,
 	}
-	return printer.Print("/")
+	return printer.print("/")
 }
 
 type printer struct {
 	w       io.Writer
-	pkgname string
+	pkgName string
 	prefix  string
-	varname string
+	varName string
 	fs      http.FileSystem
+	indent  int
 }
 
-func (p *printer) Print(rootPath string) error {
-	headerTmpl = strings.Replace(headerTmpl, "{{prefix}}", p.prefix, -1)
+func (p *printer) write(str string, args ...interface{}) {
+	if _, err := fmt.Fprintf(p.w, str, args...); err != nil {
+		panic(err)
+	}
+}
 
-	_, err := fmt.Fprintf(p.w, headerTmpl, p.pkgname)
-	if err != nil {
+func (p *printer) line(str string, args ...interface{}) {
+	p.startLine(str+"\n", args...)
+}
+
+func (p *printer) startLine(str string, args ...interface{}) {
+	str = strings.Repeat("\t", p.indent) + str
+	p.write(str, args...)
+}
+
+func (p *printer) endLine(str string, args ...interface{}) {
+	p.write(str+"\n", args...)
+}
+
+func (p *printer) print(rootPath string) error {
+	p.line("package %s", p.pkgName)
+	p.line("")
+	p.line("// machine generated; do not edit")
+	p.line("")
+	p.line("func init() {")
+	p.indent++
+	p.startLine("%s = makefs.NewMemoryFs(makefs.MemoryFile", p.varName)
+	if err := p.printPath("/"); err != nil {
 		return err
 	}
-
-	if err := p.printPath(rootPath); err != nil {
-		return err
-	}
-
-	_, err = fmt.Fprintf(p.w, footerTmpl)
-	if err != nil {
-		return err
-	}
-
+	p.endLine(")")
+	p.indent--
+	p.line("}")
 	return nil
 }
 
@@ -83,12 +75,12 @@ func (p *printer) printPath(path string) error {
 		return err
 	}
 
-	if err := p.printFile(path, file, stat); err != nil {
+	if err := p.startFile(file, stat); err != nil {
 		return err
 	}
 
 	if !stat.IsDir() {
-		return nil
+		return p.endFile(file, stat)
 	}
 
 	stats, err := file.Readdir(-1)
@@ -96,39 +88,50 @@ func (p *printer) printPath(path string) error {
 		return err
 	}
 
-	for _, stat := range stats {
+	if len(stats) > 0 {
+		p.endLine("")
+		p.indent++
+		p.startLine("")
+	}
+
+	for i, stat := range stats {
 		subPath := gopath.Join(path, stat.Name())
 		if err := p.printPath(subPath); err != nil {
 			return err
 		}
+
+		if last := i+1 >= len(stats); last {
+			p.indent--
+		}
+		p.startLine("")
 	}
 
+	if path != "/" {
+		return p.endFile(file, stat)
+	}
+
+	p.endLine("},")
+	p.indent--
+	p.startLine("}")
 	return nil
 }
 
-func (p *printer) printFile(path string, file http.File, stat os.FileInfo) error {
-	var data string
-
-	isDir := stat.IsDir()
-
-	if !isDir {
-		d, err := ioutil.ReadAll(file)
-		if err != nil {
-			return err
-		}
-		data = string(d)
+func (p *printer) startFile(file http.File, stat os.FileInfo) error {
+	p.endLine("{")
+	p.indent++
+	p.line("Name:\t%#v,", stat.Name())
+	p.line("IsDir:\t%#v,", stat.IsDir())
+	if stat.IsDir() {
+		p.startLine("Children: []makefs.MemoryFile{")
 	}
+	return nil
+}
 
-	_, err := fmt.Fprintf(
-		p.w,
-		fileTemplate,
-		path,
-		p.prefix,
-		stat.Name(),
-		isDir,
-		stat.ModTime().Unix(),
-		stat.Size(),
-		data,
-	)
-	return err
+func (p *printer) endFile(file http.File, stat os.FileInfo) error {
+	if stat.IsDir() {
+		p.endLine("},")
+	}
+	p.indent--
+	p.line("},")
+	return nil
 }
