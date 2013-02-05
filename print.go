@@ -123,14 +123,15 @@ func (p *printer) printPath(path string) error {
 func (p *printer) startFile(file http.File, stat os.FileInfo) error {
 	p.endLine("{")
 	p.indent++
-	p.line("Name:\t%#v,", stat.Name())
-	p.line("IsDir:\t%#v,", stat.IsDir())
+	p.line("Name:\t\t%#v,", stat.Name())
+	p.line("IsDir:\t\t%#v,", stat.IsDir())
+	p.line("ModTime:\t%#v,", stat.ModTime().Unix())
 	if !stat.IsDir() {
 		data, err := ioutil.ReadAll(file)
 		if err != nil {
 			return err
 		}
-		p.line("Data:\t%#v,", string(data))
+		p.line("Data:\t\t%#v,", string(data))
 	} else {
 		p.startLine("Children: []makefs.MemoryFile{")
 	}
