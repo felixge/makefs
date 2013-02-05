@@ -1,5 +1,7 @@
 # makefs
 
+[![Build Status](https://secure.travis-ci.org/felixge/makefs.png)](http://travis-ci.org/felixge/makefs)
+
 Makefs is a virtual filesystem processor for go.
 
 The idea is to take a
