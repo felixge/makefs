@@ -14,34 +14,37 @@ func TestMemoryFs_Open(t *testing.T) {
 	// root
 	{
 		file, err := fs.Open("/")
-		defer file.Close()
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer file.Close()
+
 		if memoryFile := file.(*MemoryFile); memoryFile == &root {
-			t.Fatal("expected copy")
+			t.Error("expected copy")
 		}
 
 		if stat, err := file.Stat(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		} else if !stat.IsDir() {
 			t.Error(err)
 		}
 	}
 
 	// sub file
-	file, err := fs.Open("/foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
+	{
+		file, err := fs.Open("/foo")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer file.Close()
 
-	if stat, err := file.Stat(); err != nil {
-		t.Fatal(err)
-	} else if stat.IsDir() {
-		t.Fatal(err)
-	} else if name := stat.Name(); name != "foo" {
-		t.Fatal(name)
+		if stat, err := file.Stat(); err != nil {
+			t.Error(err)
+		} else if stat.IsDir() {
+			t.Error(err)
+		} else if name := stat.Name(); name != "foo" {
+			t.Error(name)
+		}
 	}
 
 	// non-existing file
