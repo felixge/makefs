@@ -14,7 +14,7 @@ type MemoryFs struct {
 	root MemoryFile
 }
 
-func NewMemoryFs(root MemoryFile) *MemoryFs {
+func NewMemoryFs(root MemoryFile) http.FileSystem {
 	return &MemoryFs{root: root}
 }
 
