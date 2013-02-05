@@ -3,11 +3,11 @@ package makefs
 import (
 	"bytes"
 	"crypto/sha1"
-	gopath "path"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	gopath "path"
 )
 
 // Sha1Recipe takes one source file and produces the sha1 sum as the target.

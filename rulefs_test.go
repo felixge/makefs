@@ -99,7 +99,7 @@ func TestRuleFs_RecipeCaching(t *testing.T) {
 	count := 0
 
 	rule := &rule{
-		target: "%.sha1",
+		target:  "%.sha1",
 		sources: []string{"%.txt"},
 		recipe: func(t *Task) error {
 			countLock.Lock()
@@ -138,7 +138,7 @@ func TestRuleFs_RecipeCaching(t *testing.T) {
 		}
 	}
 
-	sourcePath := fixturesDir+"/foo.txt"
+	sourcePath := fixturesDir + "/foo.txt"
 	stat, err := os.Stat(sourcePath)
 	if err != nil {
 		t.Fatal(err)

@@ -48,6 +48,6 @@ func (fs *Fs) SubFs(newRoot string) http.FileSystem {
 	return NewSubFs(fs.head, newRoot)
 }
 
-func (fs *Fs) Fprint(w io.Writer, pkg string, varName string) (error) {
+func (fs *Fs) Fprint(w io.Writer, pkg string, varName string) error {
 	return Fprint(w, fs, pkg, varName)
 }
