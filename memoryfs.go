@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	gopath "path"
 	"strings"
 	"syscall"
 	"time"
@@ -23,13 +24,18 @@ func (f *MemoryFs) Open(path string) (http.File, error) {
 		return &current, nil
 	}
 
+	trailingSlash := strings.HasSuffix(path, "/")
+	path = gopath.Clean(path)
 	parts := strings.Split(path[1:], "/")
 
 	for i, part := range parts {
 		for _, file := range current.Children {
 			if file.Name == part {
 				current = file
-				if i+1>=len(parts) {
+				if lastPart := i+1 >= len(parts); lastPart {
+					if trailingSlash && !file.IsDir {
+						break
+					}
 					return &current, nil
 				}
 				break

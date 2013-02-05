@@ -8,25 +8,29 @@ import (
 )
 
 func TestMemoryFs_Open(t *testing.T) {
-	root := MemoryFile{IsDir: true, Children: []MemoryFile{{Name: "foo"}}}
+	root := MemoryFile{IsDir: true, Children: []MemoryFile{
+		{Name: "foo"},
+		{Name: "bar", IsDir: true},
+	}}
 	fs := NewMemoryFs(root)
 
 	// root
 	{
 		file, err := fs.Open("/")
 		if err != nil {
-			t.Fatal(err)
-		}
-		defer file.Close()
-
-		if memoryFile := file.(*MemoryFile); memoryFile == &root {
-			t.Error("expected copy")
-		}
-
-		if stat, err := file.Stat(); err != nil {
 			t.Error(err)
-		} else if !stat.IsDir() {
-			t.Error(err)
+		} else {
+			defer file.Close()
+
+			if memoryFile := file.(*MemoryFile); memoryFile == &root {
+				t.Error("expected copy")
+			}
+
+			if stat, err := file.Stat(); err != nil {
+				t.Error(err)
+			} else if !stat.IsDir() {
+				t.Error(err)
+			}
 		}
 	}
 
@@ -34,22 +38,55 @@ func TestMemoryFs_Open(t *testing.T) {
 	{
 		file, err := fs.Open("/foo")
 		if err != nil {
-			t.Fatal(err)
-		}
-		defer file.Close()
+			t.Error(err)
+		} else {
+			defer file.Close()
 
-		if stat, err := file.Stat(); err != nil {
+			if stat, err := file.Stat(); err != nil {
+				t.Error(err)
+			} else if stat.IsDir() {
+				t.Error(err)
+			} else if name := stat.Name(); name != "foo" {
+				t.Error(name)
+			}
+		}
+	}
+
+	// sub file, with trailing slash
+	{
+		if _, err := fs.Open("/foo/"); !os.IsNotExist(err) {
 			t.Error(err)
-		} else if stat.IsDir() {
+		}
+	}
+
+	// sub dir
+	{
+		file, err := fs.Open("/bar/")
+		if err != nil {
 			t.Error(err)
-		} else if name := stat.Name(); name != "foo" {
-			t.Error(name)
+		} else {
+			defer file.Close()
+
+			if stat, err := file.Stat(); err != nil {
+				t.Error(err)
+			} else if !stat.IsDir() {
+				t.Error(err)
+			} else if name := stat.Name(); name != "bar" {
+				t.Error(name)
+			}
+		}
+	}
+
+	// sub dir, without trailing slash
+	{
+		if _, err := fs.Open("/bar"); err != nil {
+			t.Error(err)
 		}
 	}
 
 	// non-existing file
 	if _, err := fs.Open("/does-not-exist"); !os.IsNotExist(err) {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
