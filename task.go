@@ -5,6 +5,19 @@ import (
 	"sync"
 )
 
+type TaskErr struct{
+	Err error
+	Task *Task
+}
+
+func (err *TaskErr) Error() string {
+	return fmt.Sprintf(
+		"makefs: could not execute task for: %s: %s",
+		err.Task.target.path,
+		err.Err.Error(),
+	)
+}
+
 func newTask(targetPath string, sources []*Source, recipe Recipe) *Task {
 	task := &Task{sources: sources, recipe: recipe}
 	task.target = newTarget(targetPath, func() { task.startOnce() })
@@ -69,10 +82,8 @@ func (t *Task) run() {
 
 	// Execute recipe
 	err := t.recipe(t)
-	t.target.closeWithError(err)
-
-	// TODO: what should we really do with this?
 	if err != nil {
-		fmt.Printf("RECIPE ERROR: %s\n", err)
+		err = &TaskErr{Err: err, Task: t}
 	}
+	t.target.closeWithError(err)
 }
