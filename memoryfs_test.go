@@ -11,6 +11,7 @@ func TestMemoryFs_Open(t *testing.T) {
 	root := MemoryFile{IsDir: true, Children: []MemoryFile{
 		{Name: "foo"},
 		{Name: "bar", IsDir: true},
+		{Name: "hello", Data: "hello world"},
 	}}
 	fs := NewMemoryFs(root)
 
@@ -87,6 +88,37 @@ func TestMemoryFs_Open(t *testing.T) {
 	// non-existing file
 	if _, err := fs.Open("/does-not-exist"); !os.IsNotExist(err) {
 		t.Error(err)
+	}
+
+	// test Read(), make sure Open() returns independent files
+	{
+		a, err := fs.Open("/hello")
+		if err != nil {
+			t.Error(err)
+		} else {
+			aBuf := make([]byte, 5)
+			if n, err := a.Read(aBuf); err != nil {
+				t.Error(err)
+			} else if n != 5 {
+				t.Error(n)
+			} else if data := string(aBuf[0:n]); data != "hello" {
+				t.Error(data)
+			}
+		}
+
+		b, err := fs.Open("/hello")
+		if err != nil {
+			t.Error(err)
+		} else {
+			bBuf := make([]byte, 5)
+			if n, err := b.Read(bBuf); err != nil {
+				t.Error(err)
+			} else if n != 5 {
+				t.Error(n)
+			} else if data := string(bBuf[0:n]); data != "hello" {
+				t.Error(data)
+			}
+		}
 	}
 }
 
