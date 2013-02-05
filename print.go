@@ -3,6 +3,7 @@ package makefs
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	gopath "path"
@@ -69,6 +70,7 @@ func (p *printer) printPath(path string) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	stat, err := file.Stat()
 	if err != nil {
@@ -121,7 +123,13 @@ func (p *printer) startFile(file http.File, stat os.FileInfo) error {
 	p.indent++
 	p.line("Name:\t%#v,", stat.Name())
 	p.line("IsDir:\t%#v,", stat.IsDir())
-	if stat.IsDir() {
+	if !stat.IsDir() {
+		data, err := ioutil.ReadAll(file)
+		if err != nil {
+			return err
+		}
+		p.line("Data:\t%#v,", string(data))
+	} else {
 		p.startLine("Children: []makefs.MemoryFile{")
 	}
 	return nil

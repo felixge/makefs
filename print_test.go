@@ -14,15 +14,15 @@ import (
 
 func TestFs_Fprint(t *testing.T) {
 	fs := http.Dir(fixturesDir)
-	buf := new(bytes.Buffer)
+	output := new(bytes.Buffer)
 
-	if err := Fprint(buf, fs, "testpackage", "testVar"); err != nil {
+	if err := Fprint(output, fs, "testpackage", "testVar"); err != nil {
 		t.Fatal(err)
 	}
 
 	fset := &token.FileSet{}
 	filename := "some.go"
-	src := buf.Bytes()
+	src := output.Bytes()
 
 	file, err := parser.ParseFile(fset, filename, src, parser.ParseComments)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestFs_Fprint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	diffOutput, err := diff(buf.Bytes(), pretty.Bytes())
+	diffOutput, err := diff(output.Bytes(), pretty.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
