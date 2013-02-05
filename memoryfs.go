@@ -157,10 +157,10 @@ func (f *memoryFileInfo) Size() int64 {
 
 func (f *memoryFileInfo) Mode() os.FileMode {
 	// 4 = read
-	mode := os.FileMode(0444)
+	mode := os.FileMode(0400)
 	if f.IsDir() {
 		// 1 = execute
-		mode = mode | os.ModeDir | 0111
+		mode = mode | os.ModeDir | 0100
 	}
 	return mode
 }

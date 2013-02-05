@@ -281,7 +281,7 @@ func TestMemoryFile_Stat_File(t *testing.T) {
 		t.Error("dir mode should not be set")
 	}
 
-	if mode&0444 != 0444 {
+	if mode&0400 != 0400 {
 		t.Errorf("unexpected permission: 0%o", mode)
 	}
 }
@@ -303,7 +303,7 @@ func TestMemoryFile_Stat_Dir(t *testing.T) {
 		t.Error("dir mode should be set")
 	}
 
-	if mode&0555 != 0555 {
+	if mode&0500 != 0500 {
 		t.Errorf("unexpected permission: 0%o", mode)
 	}
 }
