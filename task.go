@@ -5,8 +5,8 @@ import (
 	"sync"
 )
 
-type TaskErr struct{
-	Err error
+type TaskErr struct {
+	Err  error
 	Task *Task
 }
 

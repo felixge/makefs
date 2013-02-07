@@ -11,7 +11,7 @@ func NewIncludeFs(base http.FileSystem, includes []string) http.FileSystem {
 }
 
 type IncludeFs struct {
-	base http.FileSystem
+	base     http.FileSystem
 	includes []string
 }
 
