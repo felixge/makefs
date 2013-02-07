@@ -27,4 +27,26 @@ func TestIncludeFs_Open(t *testing.T) {
 	if _, err := fs.Open("/sub2/sub2.txt"); !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
+
+	// check readdir, should only list the included dirs
+	file, err := fs.Open("/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stats, err := file.Readdir(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := map[string]bool{"sub": true, "sub3": true}
+	if len(stats) != len(expected) {
+		t.Fatal(len(stats))
+	}
+
+	for _, stat := range stats {
+		if name := stat.Name(); !expected[name] {
+			t.Errorf("Unexpected: %s", name)
+		}
+	}
 }
