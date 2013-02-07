@@ -54,8 +54,8 @@ func (fs *Fs) SubFs(newRoot string) http.FileSystem {
 	return NewSubFs(fs.head, newRoot)
 }
 
-func (fs *Fs) Include(includes []string) {
-	fs.head = NewIncludeFs(fs.head, includes)
+func (fs *Fs) Include(includes... string) {
+	fs.head = NewIncludeFs(fs.head, includes...)
 }
 
 func (fs *Fs) Fprint(w io.Writer, pkg string, varName string) error {

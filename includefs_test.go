@@ -7,7 +7,7 @@ import (
 )
 
 func TestIncludeFs_Open(t *testing.T) {
-	fs := NewIncludeFs(http.Dir(fixturesDir), []string{"/sub/", "/sub3/"})
+	fs := NewIncludeFs(http.Dir(fixturesDir), "/sub/", "/sub3/")
 
 	// included, should exist
 	if file, err := fs.Open("/sub/a.txt"); err != nil {

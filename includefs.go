@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func NewIncludeFs(base http.FileSystem, includes []string) http.FileSystem {
+func NewIncludeFs(base http.FileSystem, includes... string) http.FileSystem {
 	return &IncludeFs{base: base, includes: includes}
 }
 
