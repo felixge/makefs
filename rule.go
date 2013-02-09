@@ -67,6 +67,9 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 		}
 	}
 
+	if len(sources) == 0 {
+		return nil, nil
+	}
 	return sources, nil
 }
 
