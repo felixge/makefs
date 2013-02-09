@@ -30,7 +30,7 @@ var GlobTests = []struct {
 		Expected: []string{"/wild/a/4.txt", "/wild/a/5.txt", "/wild/b/6.txt"},
 	},
 	//{
-		//Pattern: "/wild/**.txt",
+		//Pattern: "/wild/**/*.txt",
 		//Expected: []string{
 			//"/wild/1.txt",
 			//"/wild/2.txt",
