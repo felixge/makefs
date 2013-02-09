@@ -13,7 +13,7 @@ import (
 // which is regrettable.
 
 // Glob implements a limited path expansion method. At this point only the *
-// (star) wildcard is implemented, but support for the recursive ** (doulbe
+// (star) wildcard is implemented, but support for the recursive ** (double
 // star) wildcard is planed. Patches for other commonly found placeholders
 // would be welcomed.
 func Glob(pattern string, fs http.FileSystem) (map[string]os.FileInfo, error) {
