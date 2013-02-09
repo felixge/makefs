@@ -74,6 +74,17 @@ var RuleFsTests = []struct {
 			&ExistCheck{"/yang.txt", true},
 		},
 	},
+	{
+		Name: "1 abs target, 1 wildcard source",
+		Rule: &rule{
+			target:  "/all.txt",
+			sources: []string{"/wild/*.txt"},
+			recipe:  CatRecipe,
+		},
+		Checks: []Checker{
+			&ReadCheck{"/all.txt", "1\n2\n3\n"},
+		},
+	},
 }
 
 func TestRuleFs_Tests(t *testing.T) {

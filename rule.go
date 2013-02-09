@@ -2,9 +2,9 @@ package makefs
 
 import (
 	"net/http"
-	"os"
 	gopath "path"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -46,25 +46,25 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 	sources := make([]*Source, 0)
 	for _, source := range r.sources {
 		sourcePath := gopath.Join(dir, insertStem(source, stem))
-		sourceFile, err := fs.Open(sourcePath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		defer sourceFile.Close()
-
-		sourceStat, err := sourceFile.Stat()
+		globSources, err := Glob(sourcePath, fs)
 		if err != nil {
 			return nil, err
 		}
 
-		sources = append(sources, &Source{
-			path: sourcePath,
-			fs:   fs,
-			stat: sourceStat,
-		})
+		globPaths := make(sort.StringSlice, 0, len(globSources))
+		for path, _ := range globSources {
+			globPaths = append(globPaths, path)
+		}
+
+		sort.Sort(globPaths)
+
+		for _, path := range globPaths {
+			sources = append(sources, &Source{
+				path: path,
+				fs:   fs,
+				stat: globSources[path],
+			})
+		}
 	}
 
 	return sources, nil
