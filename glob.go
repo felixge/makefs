@@ -29,6 +29,30 @@ func Glob(pattern string, fs http.FileSystem) (map[string]os.FileInfo, error) {
 
 		// iterate over all active basePaths, and match part against the children
 		for _, basePath := range basePaths {
+			if !part.HasWildcard() {
+				// @TODO: Remove duplication with HasWildcard()==true case below
+				path := gopath.Join(basePath, part.String())
+				file, err := fs.Open(path)
+				if os.IsNotExist(err) {
+					continue
+				} else if err != nil {
+					return nil, err
+				}
+				defer file.Close()
+
+				stat, err := file.Stat()
+				if err != nil {
+					return nil, err
+				}
+
+				if last := p+1 == len(parts); last {
+					results[path] = stat
+				} else if stat.IsDir() {
+					newBasePaths = append(newBasePaths, path)
+				}
+				continue
+			}
+
 			dir, err := fs.Open(basePath)
 			if os.IsNotExist(err) {
 				continue
@@ -62,8 +86,10 @@ func Glob(pattern string, fs http.FileSystem) (map[string]os.FileInfo, error) {
 	return results, nil
 }
 
-type stringMatcher interface {
+type globPart interface {
 	MatchString(name string) bool
+	HasWildcard() bool
+	String() string
 }
 
 type staticPart string
@@ -72,9 +98,25 @@ func (p staticPart) MatchString(name string) bool {
 	return string(p) == name
 }
 
-func parseGlob(pattern string) []stringMatcher {
+func (p staticPart) HasWildcard() bool {
+	return false
+}
+
+func (p staticPart) String() string {
+	return string(p)
+}
+
+type regexpPart struct{
+	*regexp.Regexp
+}
+
+func (r *regexpPart) HasWildcard() bool {
+	return true
+}
+
+func parseGlob(pattern string) []globPart {
 	var (
-		results = []stringMatcher{}
+		results = []globPart{}
 		// the first character is always '/', we skip that
 		parts = strings.Split(pattern[1:], "/")
 	)
@@ -90,7 +132,7 @@ func parseGlob(pattern string) []stringMatcher {
 //
 // BUG: escaped stars are not interpreted as stars, but are matched as '\*',
 // rather than '*' by the resulting stringMatcher.
-func parseGlobPart(part string) stringMatcher {
+func parseGlobPart(part string) globPart {
 	// Offsets for all the stars found.
 	stars := []int{}
 
@@ -127,5 +169,5 @@ func parseGlobPart(part string) stringMatcher {
 	}
 
 	// We use MustCompile because our regexp should always be valid.
-	return regexp.MustCompile(pattern)
+	return &regexpPart{regexp.MustCompile(pattern)}
 }
