@@ -2,7 +2,6 @@ package makefs
 
 import (
 	"net/http"
-	gopath "path"
 	"regexp"
 	"sort"
 	"strings"
@@ -27,15 +26,11 @@ func (r *rule) Check() error {
 }
 
 func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, error) {
-	var (
-		stem = ""
-		dir  = ""
-	)
-
+	var stem = ""
 	if targetPath == r.target {
 		// exact match, no stem / prefix
 	} else if isPattern(r.target) {
-		stem, dir = findStem(targetPath, r.target)
+		stem = findStem(targetPath, r.target)
 		if stem == "" {
 			return nil, nil
 		}
@@ -45,7 +40,7 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 
 	sources := make([]*Source, 0)
 	for _, source := range r.sources {
-		sourcePath := gopath.Join(dir, insertStem(source, stem))
+		sourcePath := insertStem(source, stem)
 		globSources, err := Glob(sourcePath, fs)
 		if err != nil {
 			return nil, err
@@ -76,14 +71,10 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string, error) {
 	targetPath := r.target
 	if isPattern(targetPath) {
-		var (
-			stem = ""
-			dir  = ""
-		)
-
+		var stem = ""
 		for _, source := range r.sources {
 			if isPattern(source) {
-				stem, dir = findStem(sourcePath, source)
+				stem = findStem(sourcePath, source)
 
 				// Use the first stem we find in a source
 				if stem != "" {
@@ -98,7 +89,7 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 		}
 
 		// But if we got a stem, let's insert it
-		targetPath = gopath.Join(dir, insertStem(r.target, stem))
+		targetPath = insertStem(r.target, stem)
 	}
 
 	// For this targetPath to be valid, *all* sources need to exist
@@ -113,32 +104,21 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 	return targetPath, nil
 }
 
-func findStem(path string, pattern string) (string, string) {
-	var (
-		pathDir     = gopath.Dir(path)
-		pathBase    = gopath.Base(path)
-		patternDir  = gopath.Dir(pattern)
-		patternBase = gopath.Base(pattern)
-	)
+func findStem(path string, pattern string) (string) {
+	pattern = regexp.QuoteMeta(pattern)
+	pattern = "^" + strings.Replace(pattern, "%", "(.+)", 1) + "$"
 
-	if patternDir != "." && !strings.HasSuffix(pathDir, patternDir) {
-		return "", ""
-	}
-
-	patternBase = regexp.QuoteMeta(patternBase)
-	patternBase = "^" + strings.Replace(patternBase, "%", "(.+)", 1) + "$"
-
-	matcher, err := regexp.Compile(patternBase)
+	matcher, err := regexp.Compile(pattern)
 	if err != nil {
 		panic("unreachable")
 	}
 
-	match := matcher.FindStringSubmatch(pathBase)
+	match := matcher.FindStringSubmatch(path)
 	if len(match) != 2 {
-		return "", ""
+		return ""
 	}
 
-	return match[1], pathDir
+	return match[1]
 }
 
 func insertStem(pattern string, stem string) string {
