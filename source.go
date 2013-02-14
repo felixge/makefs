@@ -39,3 +39,11 @@ func (s *Source) close() error {
 func (s *Source) Read(buf []byte) (int, error) {
 	return s.file.Read(buf)
 }
+
+func (s *Source) Path() string {
+	return s.path
+}
+
+func (s *Source) ModTime() time.Time {
+	return s.stat.ModTime()
+}
