@@ -114,17 +114,18 @@ func (r *rule) findTargetPaths(fs http.FileSystem) ([]string, error) {
 
 		for _, stat := range stats {
 			path := gopath.Join(dir, stat.Name())
-			if !stat.IsDir() {
-				target, err := r.findTargetPath(path, fs)
-				if err != nil {
-					return nil, err
-				}
-
-				if target != "" {
-					results = append(results, target)
-				}
-			} else {
+			if stat.IsDir() {
 				dirs = append(dirs, path)
+				continue
+			}
+
+			target, err := r.findTargetPath(path, fs)
+			if err != nil {
+				return nil, err
+			}
+
+			if target != "" {
+				results = append(results, target)
 			}
 		}
 	}

@@ -48,7 +48,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 	// No task means we check in the parentFs
 	file, err := fs.parent.Open(path)
 	if file != nil {
-		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
+		return &readdirProxy{File: file, fs: fs, path: path}, err
 	}
 
 	// If this is not a IsNotExist error, we can't handle it
@@ -59,7 +59,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 	notFoundErr := err
 
 	// At this point, we need to check if one of the targets of our rule
-  // indirectly creates the path we are looking for as a directory.
+	// indirectly creates the path we are looking for as a directory.
 	targets, err := fs.rule.findTargetPaths(fs.parent)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (fs *ruleFs) Open(path string) (http.File, error) {
 		}
 
 		file := &MemoryFile{Name: gopath.Base(path), IsDir: true}
-		return &readdirProxy{File: file, ruleFs: fs, path: path}, nil
+		return &readdirProxy{File: file, fs: fs, path: path}, nil
 	}
 
 	return nil, notFoundErr
@@ -113,7 +113,13 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 // BUG: For all stats produced by a rule, Readdir does not support count > 0 /
 // returns an error in this case.
 
-func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
+type readdirProxy struct {
+	http.File
+	fs   *ruleFs
+	path string
+}
+
+func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 	if count > 0 {
 		return nil, fmt.Errorf("makefs: Readdir with count > 0 not supported yet")
 	}
@@ -125,7 +131,7 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 	}
 
 	// Get all targets created by this rule
-	targets, err := fs.rule.findTargetPaths(fs.parent)
+	targets, err := file.fs.rule.findTargetPaths(file.fs.parent)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +156,7 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 			continue
 		}
 
-		targetFile, err := fs.Open(path)
+		targetFile, err := file.fs.Open(path)
 		if err != nil {
 			return nil, err
 		}
@@ -173,18 +179,8 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 
 		results = append(results, stat)
 	}
-	
+
 	// @TODO: We should probably sort the results before returning them.
 
 	return results, nil
-}
-
-type readdirProxy struct {
-	http.File
-	path   string
-	ruleFs *ruleFs
-}
-
-func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
-	return file.ruleFs.readdir(file, count)
 }
