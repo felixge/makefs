@@ -1,6 +1,7 @@
 package makefs
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	gopath "path"
@@ -87,64 +88,73 @@ func (fs *ruleFs) task(path string) (*Task, error) {
 	return task, nil
 }
 
-// BUG: ruleFs readdir may list target files more than once when using a 
-// a argument count > 0.
+// BUG: For all stats produced by a rule, Readdir does not support count > 0 /
+// returns an error in this case.
 
 func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) {
-	// Get stats from parent file system
+	if count > 0 {
+		return nil, fmt.Errorf("makefs: Readdir with count > 0 not supported yet")
+	}
+
+	// Get items from parent file system
 	stats, err := file.File.Readdir(0)
 	if err != nil {
 		return nil, err
 	}
 
-	fileDir := gopath.Clean(file.path)
+	// Get all targets created by this rule
+	targets, err := fs.rule.findTargetPaths(fs.parent)
+	if err != nil {
+		return nil, err
+	}
 
-	knownTargets := make(map[string]bool)
-	for _, stat := range stats {
-		// Resolve full path
-		sourcePath := gopath.Join(fileDir, stat.Name())
+	// Get the canonical name of this dir
+	dir := gopath.Clean(file.path)
 
-		// Resolve the targetPath for this souce (if any)
-		targetPath, err := fs.rule.resolveTargetPath(sourcePath, fs.parent)
-		if err != nil {
-			return nil, err
+	// Allocate a big enough results slice
+	results := make([]os.FileInfo, 0, len(stats)+len(targets))
+	// Keep track of all paths to remove duplicates
+	knownPaths := make(map[string]bool, len(results))
+
+	for _, path := range targets {
+		if knownPaths[path] {
+			continue
 		}
-		if targetPath == "" {
+		knownPaths[path] = true
+
+		// Check if this target is inside the directory we are listing
+		targetDir := gopath.Dir(path)
+		if targetDir != dir {
 			continue
 		}
 
-		// If we already found this target, skip it from now on
-		if knownTargets[targetPath] {
-			continue
-		}
-		knownTargets[targetPath] = true
-
-		// We only care about targets inside the directory being read
-		targetDir := gopath.Dir(targetPath)
-		if targetDir != fileDir {
-			continue
-		}
-
-		// Open the target http file
-		targetFile, err := fs.Open(targetPath)
+		targetFile, err := fs.Open(path)
 		if err != nil {
 			return nil, err
 		}
 		defer targetFile.Close()
 
-		// Get the stat info (this does not trigger the recipe unless Size()
-		// is invoked).
 		targetStat, err := targetFile.Stat()
 		if err != nil {
 			return nil, err
 		}
 
-		// @TODO check if this target is overwriting a source, if so replace
-		// it instead of append.
-		stats = append(stats, targetStat)
+		results = append(results, targetStat)
 	}
 
-	return stats, nil
+	for _, stat := range stats {
+		path := gopath.Join(dir, stat.Name())
+		if knownPaths[path] {
+			continue
+		}
+		knownPaths[path] = true
+
+		results = append(results, stat)
+	}
+	
+	// @TODO: We should probably sort the results before returning them.
+
+	return results, nil
 }
 
 type readdirProxy struct {

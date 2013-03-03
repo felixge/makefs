@@ -33,6 +33,29 @@ var RuleFsTests = []struct {
 		},
 	},
 	{
+		Name: "1 abs target, 1 abs source (in sub dir)",
+		Rule: &rule{
+			target:  "/%.sha1",
+			sources: []string{"/sub/%.txt"},
+			recipe:  Sha1Recipe,
+		},
+		Checks: []Checker{
+			&ExistCheck{"/a.sha1", true},
+		},
+	},
+	{
+		Name: "1 abs target (creating new dir), 1 abs source",
+		Rule: &rule{
+			target:  "/some/new/dir/foo.sha1",
+			sources: []string{"/foo.txt"},
+			recipe:  Sha1Recipe,
+		},
+		Checks: []Checker{
+			&ReadCheck{"/some/new/dir/foo.sha1", FooSha1},
+			&ExistCheck{"/some/new/dir/foo.sha1", true},
+		},
+	},
+	{
 		Name: "1 abs target, 2 abs sources",
 		Rule: &rule{
 			target:  "/yin-yang.txt",

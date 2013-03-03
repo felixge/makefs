@@ -1,7 +1,9 @@
 package makefs
 
 import (
+	"fmt"
 	"net/http"
+	gopath "path"
 	"regexp"
 	"sort"
 	"strings"
@@ -68,7 +70,59 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 	return sources, nil
 }
 
-func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string, error) {
+func (r *rule) findTargetPaths(fs http.FileSystem) ([]string, error) {
+	var (
+		dirs    = []string{"/"}
+		results = []string{}
+	)
+
+	for len(dirs) > 0 {
+		dir := dirs[0]
+		dirs = dirs[1:]
+
+		// Open the dir
+		file, err := fs.Open(dir)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		stat, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		// This should never happen / might be panic-worthy.
+		if !stat.IsDir() {
+			return nil, fmt.Errorf("makefs: unexpected file in findTargetPaths at: %s", dir)
+		}
+
+		stats, err := file.Readdir(-1)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, stat := range stats {
+			path := gopath.Join(dir, stat.Name())
+			if !stat.IsDir() {
+				target, err := r.findTargetPath(path, fs)
+				if err != nil {
+					return nil, err
+				}
+
+				if target != "" {
+					results = append(results, target)
+				}
+			} else {
+				dirs = append(dirs, path)
+			}
+		}
+	}
+
+	return results, nil
+}
+
+func (r *rule) findTargetPath(sourcePath string, fs http.FileSystem) (string, error) {
 	targetPath := r.target
 	if isPattern(targetPath) {
 		var stem = ""
@@ -104,7 +158,7 @@ func (r *rule) resolveTargetPath(sourcePath string, fs http.FileSystem) (string,
 	return targetPath, nil
 }
 
-func findStem(path string, pattern string) (string) {
+func findStem(path string, pattern string) string {
 	pattern = regexp.QuoteMeta(pattern)
 	pattern = "^" + strings.Replace(pattern, "%", "(.+)", 1) + "$"
 
