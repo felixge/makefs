@@ -6,39 +6,39 @@ import (
 )
 
 var GlobTests = []struct {
-	Pattern string
+	Pattern  string
 	Expected []string
 }{
 	{
-		Pattern: "/foo.txt",
+		Pattern:  "/foo.txt",
 		Expected: []string{"/foo.txt"},
 	},
 	{
-		Pattern: "/wild/*.txt",
+		Pattern:  "/wild/*.txt",
 		Expected: []string{"/wild/1.txt", "/wild/2.txt", "/wild/3.txt"},
 	},
 	{
-		Pattern: "/wild/1.*xt",
+		Pattern:  "/wild/1.*xt",
 		Expected: []string{"/wild/1.txt"},
 	},
 	{
-		Pattern: "/wild/*.*xt",
+		Pattern:  "/wild/*.*xt",
 		Expected: []string{"/wild/1.txt", "/wild/2.txt", "/wild/3.txt"},
 	},
 	{
-		Pattern: "/wild/*/*.txt",
+		Pattern:  "/wild/*/*.txt",
 		Expected: []string{"/wild/a/4.txt", "/wild/a/5.txt", "/wild/b/6.txt"},
 	},
 	//{
-		//Pattern: "/wild/**/*.txt",
-		//Expected: []string{
-			//"/wild/1.txt",
-			//"/wild/2.txt",
-			//"/wild/3.txt",
-			//"/wild/a/4.txt",
-			//"/wild/a/5.txt",
-			//"/wild/b/6.txt",
-		//},
+	//Pattern: "/wild/**/*.txt",
+	//Expected: []string{
+	//"/wild/1.txt",
+	//"/wild/2.txt",
+	//"/wild/3.txt",
+	//"/wild/a/4.txt",
+	//"/wild/a/5.txt",
+	//"/wild/b/6.txt",
+	//},
 	//},
 }
 

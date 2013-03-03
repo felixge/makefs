@@ -106,7 +106,7 @@ func (p staticPart) String() string {
 	return string(p)
 }
 
-type regexpPart struct{
+type regexpPart struct {
 	*regexp.Regexp
 }
 

@@ -54,7 +54,7 @@ func (fs *Fs) SubFs(newRoot string) http.FileSystem {
 	return NewSubFs(fs.head, newRoot)
 }
 
-func (fs *Fs) Include(includes... string) {
+func (fs *Fs) Include(includes ...string) {
 	fs.head = NewIncludeFs(fs.head, includes...)
 }
 
