@@ -71,6 +71,16 @@ func (r *rule) findSources(targetPath string, fs http.FileSystem) ([]*Source, er
 }
 
 func (r *rule) findTargetPaths(fs http.FileSystem) ([]string, error) {
+	// Optimization: Handle simple case where target is an absolute path / we
+	// just need to verify that the sources exist.
+	if !isPattern(r.target) {
+		path, err := r.findTargetPath("", fs)
+		if err != nil {
+			return nil, err
+		}
+		return []string{path}, nil
+	}
+
 	var (
 		dirs    = []string{"/"}
 		results = []string{}

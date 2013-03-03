@@ -2,9 +2,11 @@ package makefs
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	gopath "path"
+	"strings"
 	"sync"
 )
 
@@ -37,22 +39,42 @@ func (err errInvalidRule) Error() string {
 
 func (fs *ruleFs) Open(path string) (http.File, error) {
 	// Try to synthesize a task for the given path
-	task, err := fs.task(path)
+	if task, err := fs.task(path); err != nil {
+		return nil, err
+	} else if task != nil {
+		return task.target.httpFile(), nil
+	}
+
+	// No task means we check in the parentFs
+	file, err := fs.parent.Open(path)
+	if file != nil {
+		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
+	}
+
+	// If this is not a IsNotExist error, we can't handle it
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+	// keep a reference to this error, in case we can not recover from it
+	notFoundErr := err
+
+	// At this point, we need to check if one of the targets of our rule
+  // indirectly creates the path we are looking for as a directory.
+	targets, err := fs.rule.findTargetPaths(fs.parent)
 	if err != nil {
 		return nil, err
 	}
 
-	// No task means we just forward this request to the parent fs. However, we
-	// return a readdirProxy to hijack any Readdir() calls on the returned file.
-	if task == nil {
-		file, err := fs.parent.Open(path)
-		if file == nil {
-			return nil, err
+	for _, target := range targets {
+		if !strings.HasPrefix(target, path) {
+			continue
 		}
-		return &readdirProxy{File: file, ruleFs: fs, path: path}, err
+
+		file := &MemoryFile{Name: gopath.Base(path), IsDir: true}
+		return &readdirProxy{File: file, ruleFs: fs, path: path}, nil
 	}
 
-	return task.target.httpFile(), nil
+	return nil, notFoundErr
 }
 
 func (fs *ruleFs) task(path string) (*Task, error) {
@@ -98,7 +120,7 @@ func (fs *ruleFs) readdir(file *readdirProxy, count int) ([]os.FileInfo, error) 
 
 	// Get items from parent file system
 	stats, err := file.File.Readdir(0)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
