@@ -53,6 +53,8 @@ var RuleFsTests = []struct {
 		Checks: []Checker{
 			&ReadCheck{"/some/new/dir/foo.sha1", FooSha1},
 			&ExistCheck{"/some/new/dir/foo.sha1", true},
+			&ExistCheck{"/some", true},
+			&ExistCheck{"/some/new", true},
 		},
 	},
 	{

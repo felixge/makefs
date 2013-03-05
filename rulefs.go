@@ -144,6 +144,8 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 	// Keep track of all paths to remove duplicates
 	knownPaths := make(map[string]bool, len(results))
 
+	// First we look for targets created by this rule that belong into this
+	// directory and add them to our results
 	for _, path := range targets {
 		if knownPaths[path] {
 			continue
@@ -170,6 +172,8 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 		results = append(results, targetStat)
 	}
 
+	// Next we consider the items for the actual directory itself, and add them
+	// as well (unless they were already added as a target).
 	for _, stat := range stats {
 		path := gopath.Join(dir, stat.Name())
 		if knownPaths[path] {
@@ -179,6 +183,35 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 
 		results = append(results, stat)
 	}
+
+	// At last, we add result entries for directories that are indirectly created
+	// by a target.
+	for _, path := range targets {
+		if !strings.HasPrefix(path, dir) {
+			continue
+		}
+
+		parts := strings.Split(path[len(dir):], "/")
+		name := parts[0]
+		if dir != "/" {
+			name = parts[1]
+		}
+
+		path := gopath.Join(dir, name)
+		if knownPaths[path] {
+			continue
+		}
+		knownPaths[path] = true
+
+		file := &MemoryFile{Name: name, IsDir: true}
+		stat, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, stat)
+	}
+
 
 	// @TODO: We should probably sort the results before returning them.
 
