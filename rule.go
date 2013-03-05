@@ -81,11 +81,28 @@ func (r *rule) findTargetPaths(fs http.FileSystem) ([]string, error) {
 		return []string{path}, nil
 	}
 
-	var (
-		dirs    = []string{"/"}
-		results = []string{}
-	)
+	// Optimization: Figure out what directories we have to consider for the
+	// patterns found in our sources, instead of just starting from "/".
+	dirsMap := make(map[string]bool, len(r.sources))
+	for _, source := range r.sources {
+		offset := strings.Index(source, "%")
+		if offset < 0 {
+			continue
+		}
 
+		dir := gopath.Dir(source[0:offset])
+		if dir == "." {
+			dir = "/"
+		}
+		dirsMap[dir] = true
+	}
+
+	dirs := make([]string, 0, len(dirsMap))
+	for dir, _ := range dirsMap {
+		dirs = append(dirs, dir)
+	}
+
+	results := []string{}
 	for len(dirs) > 0 {
 		dir := dirs[0]
 		dirs = dirs[1:]
