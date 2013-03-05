@@ -212,7 +212,6 @@ func (file *readdirProxy) Readdir(count int) ([]os.FileInfo, error) {
 		results = append(results, stat)
 	}
 
-
 	// @TODO: We should probably sort the results before returning them.
 
 	return results, nil
